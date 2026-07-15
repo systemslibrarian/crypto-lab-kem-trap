@@ -1,0 +1,581 @@
+/* KEM Trap — theme + lab styles.
+   Dark is the default (no prefers-color-scheme). The full palette lives under
+   :root; light is an override under :root[data-theme="light"]. Muted text lowers
+   lightness (never opacity); text on colored fills uses a dedicated ink token;
+   state is always icon + text + color, never color alone. */
+
+:root {
+  --accent: #7c3aed; /* brand accent — also consumed by the shared top bar */
+
+  color-scheme: dark;
+  --bg: #0b0f17;
+  --surface: #131a26;
+  --surface-2: #1b2434;
+  --border: #2c3850;
+  --text: #e9edf6;
+  --text-dim: #aab6cc; /* ≥ 4.5:1 on --bg */
+  --text-muted: #8593ac;
+  --accent-text: #c4b5fd; /* lighter accent for text/links on dark */
+  --accent-line: #8b5cf6;
+
+  --v-accept: #4ade80; /* green — icon/label, ≥ 4.5:1 on card bg */
+  --v-reject: #7dabf8; /* blue — a correct refusal, NOT an alarm */
+  --v-alarm: #ff8080; /* red — accepted something it should not have */
+  --v-neutral: #c8d2e4; /* the crypto-result badge: no judgement */
+
+  --diff: #fbbf24; /* changed-byte highlight */
+  --code-bg: #0d1420;
+
+  --maxw: 1080px;
+  --radius: 12px;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-2: #eef1f8;
+  --border: #ccd4e2;
+  --text: #141a28;
+  --text-dim: #48536b; /* ≥ 4.5:1 on --bg */
+  --text-muted: #5c6884;
+  --accent-text: #6d28d9; /* darker accent for text/links on light */
+  --accent-line: #7c3aed;
+
+  --v-accept: #147340; /* darkened so accept-green text clears 4.5:1 on light fills */
+  --v-reject: #1d5fd0;
+  --v-alarm: #c62828;
+  --v-neutral: #3a465e;
+
+  --diff: #a15c00;
+  --code-bg: #f0f3fa;
+}
+
+/* html carries its own background-color (longhand — the shorthand is missed by
+   axe/WebKit) so the theme paints before the stylesheet loads. */
+html {
+  background-color: #0b0f17;
+}
+html[data-theme='light'] {
+  background-color: #f5f7fb;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.55;
+}
+
+/* Base rules scoped to #app so they never fight the always-dark shared top bar. */
+#app {
+  display: block;
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 clamp(0.9rem, 3vw, 2rem) 3rem;
+}
+#app p {
+  margin: 0 0 0.75rem;
+}
+#app a {
+  color: var(--accent-text);
+  text-decoration: underline; /* persistent underline, not color alone */
+  text-underline-offset: 2px;
+}
+#app a:hover {
+  text-decoration-thickness: 2px;
+}
+#app :focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Visually-hidden text (screen-reader-only labels for changed bytes, etc.). */
+.vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Hero (standard managed block) ─────────────────────────────────────────── */
+/* BEGIN cl-hero standard — managed, keep in sync across fleet */
+.cl-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:clamp(1rem,4vw,3rem);flex-wrap:wrap;margin:clamp(1rem,3vw,2rem) 0 1.5rem;}
+.cl-hero-main{flex:1 1 22rem;min-width:min(100%,20rem);}
+.cl-hero-title{margin:0;font-size:clamp(1.6rem,3.8vw,2.7rem);font-weight:700;line-height:1.1;letter-spacing:.01em;}
+.cl-hero-sub{margin:.4rem 0 0;font-size:clamp(.9rem,1.6vw,1.05rem);letter-spacing:.01em;color:var(--text-dim);}
+.cl-hero-desc{margin:.55rem 0 0;font-size:1rem;line-height:1.5;color:var(--text-dim);max-width:60ch;}
+.cl-hero-why{flex:0 1 min(40%,26rem);min-width:min(100%,15rem);border:1px solid var(--border);border-radius:10px;padding:.85rem 1.05rem;background:color-mix(in oklab,var(--accent) 6%,transparent);}
+.cl-hero-why-label{display:block;font-size:.68rem;font-weight:700;letter-spacing:.14em;color:var(--accent-text);}
+.cl-hero-why-text{margin:.35rem 0 0;font-size:.95rem;line-height:1.5;}
+@media (max-width:640px){.cl-hero{flex-direction:column;}.cl-hero-why{flex-basis:auto;width:100%;}}
+/* END cl-hero standard */
+
+/* ── Intro ─────────────────────────────────────────────────────────────────── */
+.intro {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: clamp(1rem, 3vw, 1.6rem);
+  margin-bottom: 1.5rem;
+}
+.intro-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+}
+.intro-text {
+  max-width: 72ch;
+}
+.intro-text-dim {
+  color: var(--text-dim);
+  font-size: 0.92rem;
+}
+
+/* ── Panels ────────────────────────────────────────────────────────────────── */
+.panel,
+.controls-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: clamp(1rem, 3vw, 1.5rem);
+  margin-bottom: 1.25rem;
+}
+.controls-panel {
+  border-color: var(--accent-line);
+  background: color-mix(in oklab, var(--accent) 7%, var(--surface));
+}
+.panel-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+  letter-spacing: 0.01em;
+}
+.panel-lead {
+  color: var(--text-dim);
+  max-width: 78ch;
+  margin-bottom: 1rem;
+}
+.note {
+  color: var(--text-dim);
+  font-size: 0.92rem;
+  max-width: 80ch;
+}
+
+/* ── Controls ──────────────────────────────────────────────────────────────── */
+.controls,
+.control-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.controls {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.6rem;
+}
+.control-row {
+  margin: 0.25rem 0;
+}
+.btn {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.5rem 0.9rem;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.05s;
+}
+.btn:hover {
+  border-color: var(--accent-line);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn-accent {
+  border-color: var(--accent-line);
+  background: color-mix(in oklab, var(--accent) 18%, var(--surface-2));
+}
+.toggle-label,
+.mutation-status {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+.mutation-status {
+  margin: 0.25rem 0 0;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ── Byte views ────────────────────────────────────────────────────────────── */
+.byte-block {
+  margin: 0.6rem 0;
+}
+.byte-label {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 0.25rem;
+}
+.bytes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-height: 8.5rem;
+  overflow: auto;
+  padding: 0.55rem;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+}
+.byte {
+  padding: 1px 2px;
+  border-radius: 3px;
+  color: var(--text);
+}
+.byte-diff {
+  background: color-mix(in oklab, var(--diff) 28%, transparent);
+  outline: 1px solid var(--diff);
+  font-weight: 700;
+}
+.byte-more {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ── Step list (FO branch) ─────────────────────────────────────────────────── */
+.step-list,
+.buffer-steps {
+  list-style: none;
+  counter-reset: step;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+.step,
+.buffer-step {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  margin-bottom: 0.6rem;
+  background: var(--surface-2);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.step.is-active {
+  border-left-color: var(--accent-line);
+  box-shadow: 0 0 0 1px var(--accent-line);
+}
+.step.is-done {
+  border-left-color: color-mix(in oklab, var(--accent) 40%, var(--border));
+}
+.step-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.98rem;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+.compare {
+  margin: 0;
+  font-weight: 600;
+}
+.compare-eq {
+  color: var(--v-accept);
+}
+.compare-ne {
+  color: var(--v-alarm);
+}
+
+/* Branch candidates */
+.branch {
+  display: grid;
+  gap: 0.6rem;
+}
+.candidate {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+}
+.candidate.is-chosen {
+  border-style: solid;
+  border-color: var(--accent-line);
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+}
+.candidate.is-dropped {
+  opacity: 1;
+  color: var(--text-dim);
+}
+.candidate-tag {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
+}
+.candidate.is-dropped .candidate-tag {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+/* ── Indicators (crypto result vs. verdict) ────────────────────────────────── */
+.indicator {
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  margin: 0.5rem 0;
+  background: var(--surface);
+}
+.indicator-kicker {
+  display: block;
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 0.15rem;
+}
+.indicator-body {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.indicator-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.indicator-text {
+  font-weight: 700;
+  font-size: 0.98rem;
+}
+.indicator-detail {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+.v-accept {
+  border-left-color: var(--v-accept);
+}
+.v-accept .indicator-icon,
+.v-accept .indicator-text {
+  color: var(--v-accept);
+}
+.v-reject {
+  border-left-color: var(--v-reject);
+}
+.v-reject .indicator-icon,
+.v-reject .indicator-text {
+  color: var(--v-reject);
+}
+.v-alarm {
+  border-left-color: var(--v-alarm);
+  background: color-mix(in oklab, var(--v-alarm) 10%, var(--surface));
+}
+.v-alarm .indicator-icon,
+.v-alarm .indicator-text {
+  color: var(--v-alarm);
+}
+.v-neutral {
+  border-left-color: var(--v-neutral);
+}
+.v-neutral .indicator-text {
+  color: var(--text);
+}
+
+/* ── Caller grid ───────────────────────────────────────────────────────────── */
+.caller-grid,
+.oracle-grid,
+.prov-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 0.9rem;
+}
+.caller-card,
+.oracle-col,
+.prov-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  background: var(--surface-2);
+}
+.caller-card.verdict-alarm {
+  border-color: var(--v-alarm);
+}
+.caller-card.verdict-accept {
+  border-color: color-mix(in oklab, var(--v-accept) 55%, var(--border));
+}
+.caller-name,
+.oracle-name,
+.prov-name {
+  margin: 0 0 0.15rem;
+  font-size: 1.02rem;
+}
+.caller-sub {
+  margin: 0 0 0.5rem;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+.caller-note {
+  font-size: 0.88rem;
+  margin: 0.4rem 0;
+}
+
+/* ── Fail-open buffer ──────────────────────────────────────────────────────── */
+.code {
+  margin: 0 0 0.9rem;
+  padding: 0.85rem 1rem;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: auto;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.buffer-verdicts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 0.6rem;
+}
+
+/* ── Oracle ────────────────────────────────────────────────────────────────── */
+.oracle-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.4rem 0;
+  font-size: 0.88rem;
+}
+.oracle-table th,
+.oracle-table td {
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+}
+.oracle-table th {
+  color: var(--text-dim);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.oracle-col.is-oracle {
+  border-color: var(--v-alarm);
+}
+.oracle-col.is-uniform {
+  border-color: color-mix(in oklab, var(--v-accept) 45%, var(--border));
+}
+.oracle-flag {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin: 0.35rem 0 0.15rem;
+}
+.oracle-flag-bad {
+  color: var(--v-alarm);
+}
+.oracle-flag-ok {
+  color: var(--v-accept);
+}
+.oracle-current,
+.prov-fact {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+.oracle-live {
+  margin-top: 0.8rem;
+  font-weight: 600;
+}
+
+/* ── Provenance ────────────────────────────────────────────────────────────── */
+.prov-card.prov-ghost {
+  border-color: var(--v-alarm);
+}
+.prov-card.prov-agreed {
+  border-color: color-mix(in oklab, var(--v-accept) 55%, var(--border));
+}
+.prov-fact {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0.3rem 0;
+}
+.prov-fact-val {
+  font-family: ui-monospace, monospace;
+  font-weight: 700;
+  color: var(--text);
+  font-size: 1.1rem;
+}
+
+/* ── Callouts + scope notes ────────────────────────────────────────────────── */
+.callout {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.7rem 0.9rem;
+  margin: 0.8rem 0;
+  background: var(--surface-2);
+}
+.callout p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+.callout-icon {
+  font-size: 1.1rem;
+  line-height: 1.4;
+}
+.callout-reject {
+  border-color: var(--v-reject);
+}
+.callout-precise {
+  border-color: var(--accent-line);
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface-2));
+}
+.scope-note {
+  margin: 0.9rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  border-top: 1px dashed var(--border);
+  padding-top: 0.6rem;
+}
+.scope-note-tag {
+  font-weight: 700;
+  color: var(--accent-text);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+}
+
+/* ── Scripture footer ──────────────────────────────────────────────────────── */
+.scripture-footer {
+  max-width: var(--maxw);
+  margin: 1rem auto 0;
+  padding: 1.5rem clamp(0.9rem, 3vw, 2rem) 2.5rem;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+.scripture-footer p {
+  margin: 0;
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .bytes {
+    max-height: 7rem;
+  }
+}
