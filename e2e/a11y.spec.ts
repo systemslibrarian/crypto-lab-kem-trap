@@ -3,9 +3,10 @@ import { expect, test, type Page } from '@playwright/test';
 
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
-// Reveal collapsed/animated/injected content and drive the live demo so the
-// dynamic result regions are present when axe scans.
-async function prepare(page: Page): Promise<void> {
+// Reveal collapsed / progressively-hidden content so axe scans it. The FO panel
+// hides not-yet-revealed steps with the `hidden` attribute for real users; here
+// we un-hide them all so the whole branch is scanned.
+async function reveal(page: Page): Promise<void> {
   await page.addStyleTag({
     content: `*,*::before,*::after{animation:none!important;transition:none!important}`,
   });
@@ -14,16 +15,10 @@ async function prepare(page: Page): Promise<void> {
     document.querySelectorAll<HTMLElement>('[hidden],[role="tabpanel"]').forEach((el) => {
       el.removeAttribute('hidden');
       el.style.display = '';
-      el.classList.add('active', 'is-active', 'open');
+      el.classList.add('active', 'is-active', 'open', 'is-revealed');
     });
   });
-  for (const b of await page.locator('#app button').all()) {
-    const label = ((await b.textContent()) || '').toLowerCase();
-    if (/run|compute|sign|verify|encrypt|simulate|start|step|flip|corrupt/.test(label)) {
-      await b.click().catch(() => {});
-    }
-  }
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(200);
 }
 
 async function scan(page: Page): Promise<void> {
@@ -37,16 +32,25 @@ async function scan(page: Page): Promise<void> {
   ).toEqual([]);
 }
 
+// Scan a clean state (full valid FO branch) AND a tampered state (a flipped bit
+// drives the REJECT / ALARM styling and the FO rejection branch) so both the
+// success and failure palettes are checked.
+async function scanBothStates(page: Page): Promise<void> {
+  await reveal(page);
+  await scan(page);
+  await page.locator('#app button', { hasText: 'Flip a random bit' }).click();
+  await reveal(page); // re-hide happens on re-render; reveal the FO branch again
+  await scan(page);
+}
+
 test('no WCAG A/AA violations — dark theme', async ({ page }) => {
   await page.goto('.');
-  await prepare(page);
-  await scan(page);
+  await scanBothStates(page);
 });
 
 test('no WCAG A/AA violations — light theme', async ({ page }) => {
   await page.goto('.');
   await page.locator('#cl-theme-toggle').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-  await prepare(page);
-  await scan(page);
+  await scanBothStates(page);
 });

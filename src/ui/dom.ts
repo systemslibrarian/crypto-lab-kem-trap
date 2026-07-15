@@ -42,36 +42,52 @@ export function panel(id: string, title: string, lead?: string): HTMLElement {
  * A scrollable byte view. Meets the a11y rule for overflow regions: focusable,
  * role="region" (labelled), so keyboard users can reach and read it. Bytes that
  * differ from `diffAgainst` are marked with text + icon + color (never color
- * alone). `limit` truncates very long buffers with an explicit "…(+N more)".
+ * alone).
+ *
+ * Windowing: `limit` shows the first N bytes; `center` instead shows a window
+ * around a specific index (padded with a leading/trailing gap marker) so the
+ * exact byte the learner just mutated is always visible rather than scrolled
+ * off. The visible range is stated in the label so offsets stay honest.
  */
 export function byteView(
   label: string,
   bytes: Uint8Array,
-  opts: { diffAgainst?: Uint8Array; limit?: number } = {},
+  opts: { diffAgainst?: Uint8Array; limit?: number; center?: number } = {},
 ): HTMLElement {
-  const limit = opts.limit ?? bytes.length;
-  const region = el('div', {
-    class: 'bytes',
-    role: 'region',
-    'aria-label': label,
-    tabindex: '0',
-  });
-  const shown = Math.min(limit, bytes.length);
-  for (let i = 0; i < shown; i++) {
+  const region = el('div', { class: 'bytes', role: 'region', tabindex: '0' });
+
+  let start = 0;
+  let end = Math.min(opts.limit ?? bytes.length, bytes.length);
+  if (opts.center !== undefined) {
+    const span = opts.limit ?? 24;
+    start = Math.max(0, Math.min(opts.center - (span >> 1), bytes.length - span));
+    start = Math.max(0, start);
+    end = Math.min(bytes.length, start + span);
+  }
+
+  const range =
+    start === 0 && end === bytes.length
+      ? `${bytes.length} bytes`
+      : `bytes ${start}–${end - 1} of ${bytes.length}`;
+  const fullLabel = `${label} (${range})`;
+  region.setAttribute('aria-label', fullLabel);
+
+  if (start > 0) region.append(el('span', { class: 'byte byte-more', text: `…${start} before ` }));
+  for (let i = start; i < end; i++) {
     const b = bytes[i];
     const differs = opts.diffAgainst ? opts.diffAgainst[i] !== b : false;
     const cell = el('span', {
       class: differs ? 'byte byte-diff' : 'byte',
       title: `byte ${i} = 0x${b.toString(16).padStart(2, '0')}${differs ? ' (changed)' : ''}`,
     }, [b.toString(16).padStart(2, '0')]);
-    if (differs) cell.append(el('span', { class: 'vh', text: ' changed' }));
+    if (differs) cell.append(el('span', { class: 'vh', text: ` byte ${i} changed` }));
     region.append(cell);
   }
-  if (bytes.length > shown) {
-    region.append(el('span', { class: 'byte byte-more', text: `…(+${bytes.length - shown} more)` }));
+  if (end < bytes.length) {
+    region.append(el('span', { class: 'byte byte-more', text: ` +${bytes.length - end} more` }));
   }
   return el('div', { class: 'byte-block' }, [
-    el('span', { class: 'byte-label', text: label }),
+    el('span', { class: 'byte-label', text: fullLabel }),
     region,
   ]);
 }
@@ -93,7 +109,10 @@ const VERDICT_META: Record<Verdict, { icon: string; text: string; cls: string }>
  */
 export function verdictBadge(verdict: Verdict, detail?: string): HTMLElement {
   const m = VERDICT_META[verdict];
-  return el('div', { class: `indicator ${m.cls}`, role: 'status', 'aria-live': 'polite' }, [
+  // Not a live region: on-screen results are static once rendered. A single
+  // consolidated announcer (see lab.ts) narrates changes for screen readers so
+  // one bit-flip does not fire a dozen simultaneous announcements.
+  return el('div', { class: `indicator ${m.cls}`, 'aria-label': `Security verdict: ${m.text}` }, [
     el('span', { class: 'indicator-kicker', text: 'Security verdict' }),
     el('span', { class: 'indicator-body' }, [
       el('span', { class: 'indicator-icon', 'aria-hidden': 'true', text: m.icon }),
@@ -116,7 +135,7 @@ export function cryptoResultBadge(opts: {
   const succeeded = opts.returnCode === 0;
   const kindText =
     opts.secretKind === 'agreed' ? 'agreed secret' : 'implicit-rejection secret (K̄)';
-  return el('div', { class: 'indicator v-neutral', role: 'status', 'aria-live': 'polite' }, [
+  return el('div', { class: 'indicator v-neutral' }, [
     el('span', { class: 'indicator-kicker', text: 'Cryptographic result' }),
     el('span', { class: 'indicator-body' }, [
       el('span', { class: 'indicator-icon', 'aria-hidden': 'true', text: succeeded ? '↩' : '⚠' }),

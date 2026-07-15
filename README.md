@@ -26,11 +26,11 @@ The subject of this lab is the one thing FIPS 203 §7.3 makes non-negotiable: **
 
 ## Exhibits
 
-1. **The Fujisaki–Okamoto branch** — step through a real Decapsulation: receive `c` → decrypt to `m'` → re-encrypt to `c'` → compare → branch to `K̂` (agreed) or `K̄ = J(z‖c)` (implicit rejection). Every intermediate is shown, not asserted; both candidate secrets are displayed and the returned one is highlighted.
+1. **The Fujisaki–Okamoto branch** — reveal a real Decapsulation one step at a time: receive `c` → decrypt to `m'` → re-encrypt to `c'` → compare → branch to `K̂` (agreed) or `K̄ = J(z‖c)` (implicit rejection). Every intermediate is shown, not asserted; the byte views centre on the exact byte you flipped, and both candidate secrets are displayed with the returned one highlighted.
 2. **Same ciphertext, two callers** — SAFE vs. BROKEN side by side. The **cryptographic result** ("Decaps returned 32 bytes") and the **security verdict** (ACCEPT / REJECT / ALARM) are rendered as *separate* indicators and never merged. A forged-but-accepted outcome renders as ALARM, not green.
 3. **The fail-open output buffer** — the scoped centerpiece, modeled on a real FFI shape: `rc` captured but never branched on, `derive_session_key(ss)` run regardless. Watch the 32-byte buffer hold stack garbage or a previous call's secret, then watch the session key on it when Decaps rejects a malformed ciphertext and leaves the buffer untouched.
-4. **The oracle a chatty caller hands out** — the SAFE caller answers every failure identically; a verbose broken caller answers differently for valid vs. invalid ciphertexts. That one-bit-per-query difference is a plaintext-checking oracle. Flip a bit and watch the verbose answer flip.
-5. **Provenance** — one ciphertext to Bob; Bob gets the agreed secret, Carol (the wrong recipient) also gets 32 well-formed bytes. "32 bytes arrived" is not "a secret with the intended party."
+4. **The oracle a chatty caller hands out** — the SAFE caller answers every failure identically; a verbose broken caller differs across three channels at once (message text, length, and code path / timing). Any one is a plaintext-checking oracle. Flip a bit and watch all three flip. (The timing channel is modeled as control flow, not benchmarked.)
+5. **Provenance** — one ciphertext to Bob; Bob gets the agreed secret, Carol (the wrong recipient) also gets 32 well-formed bytes. "32 bytes arrived" is not "a secret with the intended party" — and the panel *shows* the fix: a confirmation MAC over the transcript verifies for Bob and fails for Carol.
 
 **Break-it-yourself:** the tamper controls (flip a bit, corrupt the length, regenerate keys) drive every panel against the real primitive and the real verifier. The learner *causes* the failure; nothing here is a canned animation.
 
@@ -72,11 +72,11 @@ npm run preview    # serve the production build
 
 ## Build & Verify
 
-- **24 unit tests** (Vitest) across three files, run in CI before deploy:
+- **25 unit tests** (Vitest) across three files, run in CI before deploy:
   - `src/__tests__/mlkem.test.ts` — round-trips, FIPS 203 lengths, implicit-rejection (never throws on a wrong-but-well-formed ciphertext), and **3 deterministic known-answer vectors** pinned to the ACVP-validated reference (`src/kem/vectors.ts`).
   - `src/__tests__/fo-transform.test.ts` — the transparent FO reconstruction checked **byte-for-byte against the reference `decapsulate`** across valid and tampered ciphertexts, plus `m'` recovery and `J(z‖c)` = SHAKE256(z‖c) verification.
-  - `src/__tests__/callers.test.ts` — SAFE uniform rejection + confirmation, BROKEN fail-open on stale buffers, the oracle distinguisher, and provenance.
-- **Accessibility gate:** `@axe-core/playwright` scans the production build for zero WCAG 2.1 A/AA violations in **both** themes (`e2e/a11y.spec.ts`). The GitHub Pages deploy is blocked on any regression.
+  - `src/__tests__/callers.test.ts` — SAFE uniform rejection + confirmation, BROKEN fail-open on stale buffers, the oracle distinguisher, provenance, and the confirmation-MAC fix (verifies for the intended party, fails for the wrong one).
+- **Accessibility gate:** `@axe-core/playwright` scans the production build for zero WCAG 2.1 A/AA violations in **both** themes and in **both** a clean and a tampered (ALARM/REJECT) state (`e2e/a11y.spec.ts`); progressively-hidden content is revealed before scanning. A single consolidated live region and `prefers-reduced-motion` support round out the accessibility work. The GitHub Pages deploy is blocked on any regression.
 
 ```bash
 npm test                       # 24 unit tests + KATs

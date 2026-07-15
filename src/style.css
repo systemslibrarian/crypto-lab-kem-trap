@@ -277,6 +277,19 @@ body {
 .step.is-active {
   border-left-color: var(--accent-line);
   box-shadow: 0 0 0 1px var(--accent-line);
+  /* Motion is tied to the reveal action only — never idle. Just the newly
+     revealed (active) step animates in; prior steps stay put. */
+  animation: step-in 0.28s ease;
+}
+@keyframes step-in {
+  from {
+    opacity: 0.25;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 .step.is-done {
   border-left-color: color-mix(in oklab, var(--accent) 40%, var(--border));
@@ -462,11 +475,35 @@ body {
   border: 1px solid var(--border);
   padding: 0.35rem 0.5rem;
   text-align: left;
+  vertical-align: top;
+  word-break: break-word;
+}
+.oracle-table thead th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .oracle-table th {
   color: var(--text-dim);
   font-weight: 600;
+}
+.oracle-table td.oracle-now {
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+  outline: 1px solid var(--accent-line);
+  font-weight: 600;
+}
+.oracle-row-leak th[scope='row'] {
+  color: var(--v-alarm);
+}
+.chan-flag {
+  font-weight: 700;
   white-space: nowrap;
+}
+.chan-flag-bad {
+  color: var(--v-alarm);
+}
+.chan-flag-ok {
+  color: var(--v-accept);
 }
 .oracle-col.is-oracle {
   border-color: var(--v-alarm);
@@ -577,5 +614,20 @@ body {
 @media (max-width: 640px) {
   .bytes {
     max-height: 7rem;
+  }
+  .oracle-table {
+    font-size: 0.8rem;
+  }
+}
+
+/* Honor the user's reduced-motion preference: no reveal/hover motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

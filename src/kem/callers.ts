@@ -253,12 +253,18 @@ export function verboseOracleProfile(): OracleResponse {
 // or a key-committing step — see commit-gate) is what binds secret to identity.
 
 export interface ProvenanceResult {
+  ciphertext: Uint8Array;
   bobSecret: Uint8Array; // agreed with the sender
   carolSecret: Uint8Array; // 32 bytes, but NOT agreed with anyone
   bobIsAgreed: boolean;
   carolIsAgreed: boolean;
   bobBytes: number;
   carolBytes: number;
+  // The fix, shown rather than asserted: a confirmation MAC over the transcript,
+  // keyed from each party's secret, verifies ONLY for the intended recipient.
+  // This is what binds the raw bytes to an identity.
+  bobConfirms: boolean;
+  carolConfirms: boolean;
 }
 
 export function provenanceCheck(
@@ -269,12 +275,20 @@ export function provenanceCheck(
   const hello = senderHello(bob.publicKey, message);
   const bobSecret = decapsulate(hello.ciphertext, bob.secretKey);
   const carolSecret = decapsulate(hello.ciphertext, carol.secretKey);
+  const confirms = (secret: Uint8Array): boolean =>
+    ctEqual(
+      confirmationTag(deriveSessionKey(secret, hello.ciphertext), hello.ciphertext),
+      hello.confirmTag,
+    );
   return {
+    ciphertext: hello.ciphertext,
     bobSecret,
     carolSecret,
     bobIsAgreed: ctEqual(bobSecret, hello.sharedSecret),
     carolIsAgreed: ctEqual(carolSecret, hello.sharedSecret),
     bobBytes: bobSecret.length,
     carolBytes: carolSecret.length,
+    bobConfirms: confirms(bobSecret),
+    carolConfirms: confirms(carolSecret),
   };
 }

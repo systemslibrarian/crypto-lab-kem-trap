@@ -47,6 +47,14 @@ function notify(): void {
   for (const fn of subscribers) fn();
 }
 
+// A single screen-reader announcer. Every panel re-renders on a change, but only
+// this one live region speaks — so one bit-flip produces one concise sentence
+// about the downstream consequence, not a dozen competing announcements.
+let announcer: HTMLElement | null = null;
+function announce(): void {
+  if (announcer) announcer.textContent = stateSummary();
+}
+
 function freshState(): LabState {
   const bob = keygen();
   const carol = keygen();
@@ -95,13 +103,26 @@ function mutationLabel(): string {
   }
 }
 
+// One concise sentence describing the current state and its downstream
+// consequence, for the screen-reader announcer. Runs the real crypto so the
+// narration is never out of sync with the panels.
+function stateSummary(): string {
+  const c = currentCiphertext();
+  const base = `Ciphertext: ${mutationLabel()}.`;
+  if (!isWellFormed(c)) {
+    return `${base} Decaps rejects the malformed length, rc not zero. SAFE caller rejects. BROKEN caller alarms — it keys the session on resident buffer bytes.`;
+  }
+  const trace = decapsulateTraced(c, state.bob.secretKey);
+  if (!trace.implicitReject) {
+    return `${base} FO re-encryption matches; Decaps returns the agreed secret. SAFE caller accepts. BROKEN caller accepts — only by luck, it never confirmed.`;
+  }
+  return `${base} FO re-encryption fails; Decaps silently returns the implicit-rejection secret K-bar. SAFE caller rejects via the confirmation MAC. BROKEN caller alarms — it keys the session on K-bar.`;
+}
+
 // ── Shared mutation controls: the break-it-yourself surface ──────────────────
 function mutationControls(): HTMLElement {
-  const status = el('p', {
-    class: 'mutation-status',
-    role: 'status',
-    'aria-live': 'polite',
-  });
+  // Visible, but NOT a live region — the announcer (buildLab) owns SR narration.
+  const status = el('p', { class: 'mutation-status' });
   const paint = () => {
     status.textContent = `Current ciphertext: ${mutationLabel()}.`;
   };
@@ -148,13 +169,36 @@ function foPanel(): HTMLElement {
   const body = el('div');
   p.append(stepControls, body, stepWrap);
 
-  let highlight = 0;
+  const TOTAL = 6; // number of steps in the branch
+  let revealed = 1; // how many are currently shown (progressive reveal)
+
+  const rebuildControls = (truncated: boolean) => {
+    clear(stepControls);
+    if (truncated) return; // no branch to step through on a malformed length
+    const atEnd = revealed >= TOTAL;
+    stepControls.append(
+      button(
+        atEnd ? 'Replay from the start' : `Reveal next step  (${revealed} of ${TOTAL})`,
+        () => {
+          revealed = atEnd ? 1 : revealed + 1;
+          render();
+        },
+        'btn-accent',
+      ),
+      button('Reveal whole branch', () => {
+        revealed = TOTAL;
+        render();
+      }),
+    );
+  };
+
   const render = () => {
     clear(body);
     clear(stepWrap);
     const c = currentCiphertext();
 
     if (!isWellFormed(c)) {
+      rebuildControls(true);
       body.append(
         el('div', { class: 'callout callout-reject' }, [
           el('span', { class: 'callout-icon', 'aria-hidden': 'true', text: '⊘' }),
@@ -168,26 +212,30 @@ function foPanel(): HTMLElement {
 
     const trace = decapsulateTraced(c, state.bob.secretKey);
     const cDiff = byteDiffCount(c, state.hello.ciphertext);
+    // Centre the ciphertext views on the exact byte the learner flipped so the
+    // cause is visible, not scrolled off in a first-32 window.
+    const flipIdx = state.mutation.kind === 'bitflip' ? state.mutation.index : undefined;
+    const cView =
+      flipIdx !== undefined
+        ? byteView('ciphertext c', c, { diffAgainst: state.hello.ciphertext, center: flipIdx, limit: 24 })
+        : byteView('ciphertext c', c, { diffAgainst: state.hello.ciphertext, limit: 32 });
+    const cPrimeView =
+      flipIdx !== undefined
+        ? byteView('re-encryption c′', trace.reencrypted, { diffAgainst: c, center: flipIdx, limit: 24 })
+        : byteView('re-encryption c′', trace.reencrypted, { diffAgainst: c, limit: 32 });
+
     const steps: Array<{ t: string; body: HTMLElement }> = [
       {
         t: `Receive c${cDiff ? ` — ${cDiff} byte(s) differ from the original` : ''}`,
-        body: byteView('ciphertext c (first 32 of 1088 bytes)', c, {
-          diffAgainst: state.hello.ciphertext,
-          limit: 32,
-        }),
+        body: cView,
       },
       {
         t: 'Decrypt: m′ = K-PKE.Decrypt(dkPKE, c)',
-        body: byteView('recovered message m′ (32 bytes)', trace.mPrime, {
-          diffAgainst: state.message,
-        }),
+        body: byteView('recovered message m′', trace.mPrime, { diffAgainst: state.message }),
       },
       {
-        t: `Re-encrypt: c′ = K-PKE.Encrypt(ek, m′, G(m′‖H(ek)))`,
-        body: byteView('re-encryption c′ (first 32 bytes)', trace.reencrypted, {
-          diffAgainst: c,
-          limit: 32,
-        }),
+        t: 'Re-encrypt: c′ = K-PKE.Encrypt(ek, m′, G(m′‖H(ek)))',
+        body: cPrimeView,
       },
       {
         t: trace.ciphertextsMatch ? 'Compare: c′ == c  ✓' : 'Compare: c′ ≠ c  ✗',
@@ -221,31 +269,19 @@ function foPanel(): HTMLElement {
 
     const list = el('ol', { class: 'step-list' });
     steps.forEach((s, i) => {
-      const li = el('li', {
-        class: `step ${i === highlight ? 'is-active' : ''} ${i < highlight ? 'is-done' : ''}`,
-      }, [el('h3', { class: 'step-title', text: s.t }), s.body]);
-      list.append(li);
+      const shown = i < revealed;
+      const attrs: Record<string, string | boolean> = {
+        class: `step${shown ? ' is-revealed' : ''}${i === revealed - 1 ? ' is-active' : ''}${i < revealed - 1 ? ' is-done' : ''}`,
+      };
+      if (!shown) attrs.hidden = true; // real users reveal it; the a11y gate un-hides to scan
+      list.append(el('li', attrs, [el('h3', { class: 'step-title', text: s.t }), s.body]));
     });
     stepWrap.append(list);
+    rebuildControls(false);
   };
-
-  const rebuildControls = () => {
-    clear(stepControls);
-    stepControls.append(
-      button('Step through the branch', () => {
-        highlight = (highlight + 1) % 7;
-        render();
-      }, 'btn-accent'),
-      button('Show whole branch', () => {
-        highlight = 6;
-        render();
-      }),
-    );
-  };
-  rebuildControls();
 
   subscribers.push(() => {
-    highlight = 0;
+    revealed = 1;
     render();
   });
   render();
@@ -403,7 +439,7 @@ function oraclePanel(): HTMLElement {
   const p = panel(
     'oracle',
     '4 · The oracle a chatty caller hands out',
-    'A caller must not reveal WHY a decapsulation failed. The SAFE caller answers every failure identically. A “verbose” broken caller answers differently for valid vs. invalid ciphertexts — that one-bit-per-query difference is a plaintext-checking oracle. Flip a bit above and watch the verbose answer flip.',
+    'A caller must not reveal WHY a decapsulation failed — across ANY channel. The SAFE caller answers every failure identically. A “verbose” broken caller differs by valid vs. invalid ciphertext in three ways at once: the message text, its length, and the code path it takes (a timing tell). Any one of those is a plaintext-checking oracle. Flip a bit above and watch all three flip.',
   );
 
   const out = el('div', { class: 'oracle-out' });
@@ -416,20 +452,23 @@ function oraclePanel(): HTMLElement {
     const rejected = wellFormed ? decapsulateTraced(c, state.bob.secretKey).implicitReject : true;
     const verbose = verboseOracleProfile();
 
-    const safeAnswer = 'handshake failed';
-    const verboseAnswer = rejected ? verbose.invalidText : verbose.validText;
+    // Each channel: what the caller emits for a valid vs. an invalid ciphertext.
+    const safeChannels: OracleChannel[] = [
+      { name: 'message', valid: 'handshake failed', invalid: 'handshake failed' },
+      { name: 'length (bytes)', valid: String('handshake failed'.length), invalid: String('handshake failed'.length) },
+      { name: 'code path (timing)', valid: 'single path — constant shape', invalid: 'single path — constant shape' },
+    ];
+    const verboseChannels: OracleChannel[] = [
+      { name: 'message', valid: verbose.validText, invalid: verbose.invalidText },
+      { name: 'length (bytes)', valid: String(verbose.validText.length), invalid: String(verbose.invalidText.length) },
+      { name: 'code path (timing)', valid: 'accept path', invalid: 'early-return on FO mismatch' },
+    ];
 
     out.append(
       el('div', { class: 'oracle-grid' }, [
-        oracleCol('SAFE caller', 'handshake failed', 'handshake failed', false, safeAnswer),
-        oracleCol('Verbose broken caller', verbose.validText, verbose.invalidText, true, verboseAnswer),
+        oracleCol('SAFE caller', safeChannels, rejected),
+        oracleCol('Verbose broken caller', verboseChannels, rejected),
       ]),
-      el('p', {
-        class: 'oracle-live',
-        role: 'status',
-        'aria-live': 'polite',
-        text: `Your current ciphertext is ${rejected ? 'INVALID' : 'valid'}. SAFE says “${safeAnswer}”. Verbose says “${verboseAnswer}”.`,
-      }),
     );
   };
 
@@ -437,6 +476,7 @@ function oraclePanel(): HTMLElement {
   render();
 
   p.append(
+    el('p', { class: 'note', text: 'The timing channel is modeled as control flow (which branch the code takes), not benchmarked in your browser — real timing recovery is out of scope; see kyberslash.' }),
     el('div', { class: 'callout callout-precise' }, [
       el('span', { class: 'callout-icon', 'aria-hidden': 'true', text: 'ℹ' }),
       el('p', {
@@ -451,28 +491,59 @@ function oraclePanel(): HTMLElement {
   return p;
 }
 
-function oracleCol(
-  name: string,
-  validText: string,
-  invalidText: string,
-  distinguishable: boolean,
-  live: string,
-): HTMLElement {
-  return el('div', { class: `oracle-col ${distinguishable ? 'is-oracle' : 'is-uniform'}` }, [
+interface OracleChannel {
+  name: string;
+  valid: string;
+  invalid: string;
+}
+
+function oracleCol(name: string, channels: OracleChannel[], currentlyInvalid: boolean): HTMLElement {
+  const anyDistinguish = channels.some((ch) => ch.valid !== ch.invalid);
+  const activeCell = (active: boolean, text: string): HTMLElement =>
+    el('td', { class: active ? 'oracle-now' : '' }, [
+      document.createTextNode(`“${text}”`),
+      active ? el('span', { class: 'vh', text: ' (this ciphertext)' }) : document.createComment(''),
+    ]);
+  const rows = channels.map((ch) => {
+    const leaks = ch.valid !== ch.invalid;
+    return el('tr', { class: leaks ? 'oracle-row-leak' : 'oracle-row-uniform' }, [
+      el('th', { scope: 'row', text: ch.name }),
+      activeCell(!currentlyInvalid, ch.valid),
+      activeCell(currentlyInvalid, ch.invalid),
+      el('td', {}, [
+        el('span', { class: leaks ? 'chan-flag chan-flag-bad' : 'chan-flag chan-flag-ok' }, [
+          el('span', { 'aria-hidden': 'true', text: leaks ? '✗ ' : '✓ ' }),
+          document.createTextNode(leaks ? 'leaks' : 'uniform'),
+        ]),
+      ]),
+    ]);
+  });
+  return el('div', { class: `oracle-col ${anyDistinguish ? 'is-oracle' : 'is-uniform'}` }, [
     el('h3', { class: 'oracle-name', text: name }),
     el('table', { class: 'oracle-table' }, [
-      el('tbody', {}, [
-        el('tr', {}, [el('th', { scope: 'row', text: 'valid ct →' }), el('td', { text: `“${validText}”` })]),
-        el('tr', {}, [el('th', { scope: 'row', text: 'invalid ct →' }), el('td', { text: `“${invalidText}”` })]),
+      el(
+        'caption',
+        { class: 'vh', text: `${name}: response channels for valid vs. invalid ciphertext; the current ciphertext's cell is marked` },
+        [],
+      ),
+      el('thead', {}, [
+        el('tr', {}, [
+          el('th', { scope: 'col', text: 'channel' }),
+          el('th', { scope: 'col', text: 'valid ct' }),
+          el('th', { scope: 'col', text: 'invalid ct' }),
+          el('th', { scope: 'col', text: 'signal' }),
+        ]),
       ]),
+      el('tbody', {}, rows),
     ]),
     el('p', {
-      class: distinguishable ? 'oracle-flag oracle-flag-bad' : 'oracle-flag oracle-flag-ok',
+      class: anyDistinguish ? 'oracle-flag oracle-flag-bad' : 'oracle-flag oracle-flag-ok',
     }, [
-      el('span', { class: 'oracle-flag-icon', 'aria-hidden': 'true', text: distinguishable ? '✗' : '✓' }),
-      document.createTextNode(distinguishable ? ' Responses differ → 1-bit oracle' : ' Responses identical → no signal'),
+      el('span', { class: 'oracle-flag-icon', 'aria-hidden': 'true', text: anyDistinguish ? '✗' : '✓' }),
+      document.createTextNode(
+        anyDistinguish ? ' Distinguishable → plaintext-checking oracle' : ' Identical on every channel → no signal',
+      ),
     ]),
-    el('p', { class: 'oracle-current', text: `Now: “${live}”` }),
   ]);
 }
 
@@ -492,8 +563,8 @@ function provenancePanel(): HTMLElement {
     const r = provenanceCheck(state.bob, state.carol, state.message);
     out.append(
       el('div', { class: 'prov-grid' }, [
-        provCard('Bob (intended recipient)', r.bobSecret, r.bobIsAgreed, r.bobBytes),
-        provCard('Carol (wrong recipient)', r.carolSecret, r.carolIsAgreed, r.carolBytes),
+        provCard('Bob (intended recipient)', r.bobSecret, r.bobIsAgreed, r.bobBytes, r.bobConfirms),
+        provCard('Carol (wrong recipient)', r.carolSecret, r.carolIsAgreed, r.carolBytes, r.carolConfirms),
       ]),
     );
   };
@@ -502,35 +573,54 @@ function provenancePanel(): HTMLElement {
   render();
 
   p.append(
-    el('p', {
-      class: 'note',
-      html:
-        'The bytes carry no proof of provenance. Binding the secret to the transcript (a confirmation MAC, or a key-committing step) is what ties it to an identity — see the commit-gate demo on key commitment, linked below.',
-    }),
+    el('div', { class: 'callout callout-precise' }, [
+      el('span', { class: 'callout-icon', 'aria-hidden': 'true', text: '🔑' }),
+      el('p', {
+        html:
+          'The fix, shown above — not asserted: a <strong>confirmation MAC over the transcript</strong>, keyed from each party’s secret, is what binds the bytes to an identity. It verifies for Bob and fails for Carol. Real ML-KEM cannot hand two different keys the same secret, so the collapse never happens in the math — it happens in a caller that reads any 32 bytes as success. Key-committing constructions generalise this — see commit-gate below.',
+      }),
+    ]),
     scopeNote('a full authenticated key exchange. Provenance here is one lesson; building the handshake around it is a separate demo.'),
   );
   return p;
 }
 
-function provCard(name: string, secret: Uint8Array, agreed: boolean, bytes: number): HTMLElement {
+function provCard(
+  name: string,
+  secret: Uint8Array,
+  agreed: boolean,
+  bytes: number,
+  confirms: boolean,
+): HTMLElement {
   return el('div', { class: `prov-card ${agreed ? 'prov-agreed' : 'prov-ghost'}` }, [
     el('h3', { class: 'prov-name', text: name }),
     el('div', { class: 'prov-fact' }, [
       el('span', { class: 'prov-fact-label', text: 'Bytes received' }),
       el('span', { class: 'prov-fact-val', text: String(bytes) }),
     ]),
-    el('div', { class: `indicator ${agreed ? 'v-accept' : 'v-alarm'}`, role: 'status' }, [
+    el('div', { class: `indicator ${agreed ? 'v-accept' : 'v-alarm'}` }, [
       el('span', { class: 'indicator-kicker', text: 'Provenance' }),
       el('span', { class: 'indicator-body' }, [
         el('span', { class: 'indicator-icon', 'aria-hidden': 'true', text: agreed ? '✓' : '✗' }),
         el('span', { class: 'indicator-text', text: agreed ? 'AGREED with sender' : 'NOT agreed — a ghost secret' }),
       ]),
     ]),
-    byteView(`${name} secret (first 16 bytes)`, secret, { limit: 16 }),
+    // The fix, shown: the confirmation MAC over the transcript.
+    el('div', { class: `indicator ${confirms ? 'v-accept' : 'v-alarm'}` }, [
+      el('span', { class: 'indicator-kicker', text: 'Confirmation MAC (the fix)' }),
+      el('span', { class: 'indicator-body' }, [
+        el('span', { class: 'indicator-icon', 'aria-hidden': 'true', text: confirms ? '✓' : '✗' }),
+        el('span', { class: 'indicator-text', text: confirms ? 'VERIFIES — secret is bound' : 'FAILS — no shared transcript' }),
+      ]),
+    ]),
+    byteView(`${name} secret`, secret, { limit: 16 }),
   ]);
 }
 
 export function buildLab(root: HTMLElement): void {
+  // The one screen-reader live region for the whole lab.
+  announcer = el('div', { class: 'vh', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' });
+
   root.append(
     el('section', { class: 'controls-panel', 'aria-label': 'Tamper controls' }, [
       el('h2', { class: 'panel-title', text: 'Break it yourself' }),
@@ -539,6 +629,7 @@ export function buildLab(root: HTMLElement): void {
         text: 'These controls drive every panel below against the real ML-KEM-768 primitive and the real verifier. Flip a bit and watch honest crypto produce a dishonest outcome downstream.',
       }),
       mutationControls(),
+      announcer,
     ]),
     foPanel(),
     callersPanel(),
@@ -546,4 +637,8 @@ export function buildLab(root: HTMLElement): void {
     oraclePanel(),
     provenancePanel(),
   );
+
+  // Narrate every change through the single announcer, after the panels register.
+  subscribers.push(announce);
+  announce();
 }

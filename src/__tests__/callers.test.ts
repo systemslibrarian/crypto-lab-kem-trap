@@ -127,4 +127,12 @@ describe('provenance — "32 bytes arrived" is not "secret with the intended par
     expect(p.carolIsAgreed).toBe(false); // …but shares nothing with the sender
     expect(toHex(p.bobSecret)).not.toBe(toHex(p.carolSecret));
   });
+
+  it('the confirmation MAC binds provenance: verifies for Bob, fails for Carol', () => {
+    const bob = keygen();
+    const carol = keygen();
+    const p = provenanceCheck(bob, carol);
+    expect(p.bobConfirms).toBe(true); // the fix works for the intended party…
+    expect(p.carolConfirms).toBe(false); // …and only the intended party
+  });
 });
