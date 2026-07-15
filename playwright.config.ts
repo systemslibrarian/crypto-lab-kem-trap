@@ -1,4 +1,4 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
 
 // Accessibility gate. Runs against the production build served by `vite preview`,
 // so what passes here is what actually ships to GitHub Pages. Run `npm run build`
@@ -22,5 +22,13 @@ export default defineConfig({
     baseURL: `${ORIGIN}${BASE}`,
     colorScheme: 'dark',
   },
-  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
+  projects: [
+    // Chromium runs everything, including the full axe accessibility scan.
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // The other engines + a mobile viewport run the functional smoke only, to
+    // prove portability without paying for axe on every engine.
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] }, testMatch: /smoke\.spec\.ts/ },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] }, testMatch: /smoke\.spec\.ts/ },
+    { name: 'mobile-safari', use: { ...devices['iPhone 13'] }, testMatch: /smoke\.spec\.ts/ },
+  ],
 });

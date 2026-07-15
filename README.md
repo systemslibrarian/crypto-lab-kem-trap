@@ -76,7 +76,10 @@ npm run preview    # serve the production build
   - `src/__tests__/mlkem.test.ts` — round-trips, FIPS 203 lengths, implicit-rejection (never throws on a wrong-but-well-formed ciphertext), and **3 deterministic known-answer vectors** pinned to the ACVP-validated reference (`src/kem/vectors.ts`).
   - `src/__tests__/fo-transform.test.ts` — the transparent FO reconstruction checked **byte-for-byte against the reference `decapsulate`** across valid and tampered ciphertexts, plus `m'` recovery and `J(z‖c)` = SHAKE256(z‖c) verification.
   - `src/__tests__/callers.test.ts` — SAFE uniform rejection + confirmation, BROKEN fail-open on stale buffers, the oracle distinguisher, provenance, and the confirmation-MAC fix (verifies for the intended party, fails for the wrong one).
-- **Accessibility gate:** `@axe-core/playwright` scans the production build for zero WCAG 2.1 A/AA violations in **both** themes and in **both** a clean and a tampered (ALARM/REJECT) state (`e2e/a11y.spec.ts`); progressively-hidden content is revealed before scanning. A single consolidated live region and `prefers-reduced-motion` support round out the accessibility work. The GitHub Pages deploy is blocked on any regression.
+- **Coverage gate:** `npm run test:coverage` enforces thresholds on the cryptographic layer (`src/kem/**`), where correctness is the point — currently **98% statements / 94% branches / 96% functions / 98% lines**, gated at 95/90/95/95. The UI is covered by the e2e suites instead.
+- **Accessibility gate:** `@axe-core/playwright` scans the production build for zero WCAG 2.1 A/AA violations in **both** themes and in **both** a clean and a tampered (ALARM/REJECT) state (`e2e/a11y.spec.ts`); progressively-hidden content is revealed before scanning. A single consolidated live region and `prefers-reduced-motion` support round out the accessibility work.
+- **Cross-browser smoke:** `e2e/smoke.spec.ts` runs on **Chromium, Firefox, WebKit, and a mobile viewport** — asserting the valid / bit-flipped / length-corrupted flows, that the three verdict states (ACCEPT / REJECT / ALARM) stay visually *and* textually distinct in both themes, and that a scenario permalink restores state.
+- **Lint + bundle budget:** ESLint (typescript-eslint) and a gzip bundle budget both run in CI. The GitHub Pages deploy is blocked on any regression across all of the above.
 
 ```bash
 npm test                       # 24 unit tests + KATs
@@ -85,7 +88,15 @@ npm run build && npm run test:a11y   # a11y gate, both themes
 
 ## Performance
 
-All operations are a single ML-KEM-768 KeyGen/Encaps/Decaps (sub-millisecond each) plus small hashes; every panel re-renders synchronously on interaction with no perceptible delay.
+All operations are a single ML-KEM-768 KeyGen/Encaps/Decaps (sub-millisecond each) plus small hashes; every panel re-renders synchronously on interaction with no perceptible delay. The shipped JavaScript sits at roughly **19 kB gzipped**, enforced by a **28 kB** CI budget (`npm run bundle-budget`).
+
+## Sharing a Scenario
+
+Each tamper state (mutation kind + resident-buffer mode) is serialized into the URL hash, so a specific teaching scenario can be linked and replayed. Use the **Copy scenario link** button, the named presets (Valid / Single bit flip / Length corruption), or hand-write a link like `…/#m=flip.512.3&r=previous`. Keys stay random and are never encoded.
+
+## License
+
+MIT — see [`LICENSE`](./LICENSE).
 
 ---
 

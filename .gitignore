@@ -5,4 +5,5 @@ dist-ssr
 .vite
 playwright-report
 test-results
+coverage
 .DS_Store

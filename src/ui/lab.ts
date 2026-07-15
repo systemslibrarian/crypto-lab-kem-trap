@@ -44,7 +44,55 @@ interface LabState {
 
 const subscribers: Array<() => void> = [];
 function notify(): void {
+  writeScenario();
   for (const fn of subscribers) fn();
+}
+
+// ── Shareable scenario state (URL permalink) ─────────────────────────────────
+// The mutation and resident-buffer mode are serialized into the URL hash so a
+// specific teaching scenario can be linked and replayed. Keys stay random (not
+// in the URL); only the reproducible knobs are encoded.
+function encodeScenario(): string {
+  const mu = state.mutation;
+  const m =
+    mu.kind === 'bitflip'
+      ? `flip.${mu.index}.${mu.bit}`
+      : mu.kind === 'truncate'
+        ? `trunc.${mu.drop}`
+        : 'valid';
+  return `m=${m}&r=${state.residentKind}`;
+}
+
+function writeScenario(): void {
+  try {
+    history.replaceState(null, '', `${location.pathname}${location.search}#${encodeScenario()}`);
+  } catch {
+    /* history may be unavailable in some embeddings — the lab still works. */
+  }
+}
+
+function applyScenarioFromUrl(): void {
+  const hash = location.hash.replace(/^#/, '');
+  if (!hash) return;
+  const params = new URLSearchParams(hash);
+  const m = params.get('m');
+  if (m === 'valid') {
+    state.mutation = { kind: 'none' };
+  } else if (m?.startsWith('flip.')) {
+    const [, i, b] = m.split('.');
+    const index = Number(i);
+    const bit = Number(b);
+    if (Number.isInteger(index) && index >= 0 && index < PARAMS.ciphertext && Number.isInteger(bit) && bit >= 0 && bit < 8) {
+      state.mutation = { kind: 'bitflip', index, bit };
+    }
+  } else if (m?.startsWith('trunc.')) {
+    const drop = Number(m.split('.')[1]);
+    if (Number.isInteger(drop) && drop >= 1 && drop < PARAMS.ciphertext) {
+      state.mutation = { kind: 'truncate', drop };
+    }
+  }
+  const r = params.get('r');
+  if (r === 'garbage' || r === 'previous') state.residentKind = r;
 }
 
 // A single screen-reader announcer. Every panel re-renders on a change, but only
@@ -72,6 +120,7 @@ function freshState(): LabState {
 }
 
 let state = freshState();
+applyScenarioFromUrl(); // restore a linked scenario, if any
 
 function currentCiphertext(): Uint8Array {
   const base = state.hello.ciphertext;
@@ -150,8 +199,44 @@ function mutationControls(): HTMLElement {
     notify();
   });
 
+  // Named presets — reproducible scenarios a teacher can jump to or link.
+  const presetValid = button('Valid', () => {
+    state.mutation = { kind: 'none' };
+    notify();
+  });
+  const presetFlip = button('Single bit flip', () => {
+    state.mutation = { kind: 'bitflip', index: 512, bit: 3 };
+    notify();
+  });
+  const presetTrunc = button('Length corruption', () => {
+    state.mutation = { kind: 'truncate', drop: 1 };
+    notify();
+  });
+
+  const copyStatus = el('span', { class: 'copy-status', role: 'status', 'aria-live': 'polite' });
+  const copyLink = button('Copy scenario link', () => {
+    const link = location.href;
+    const done = () => {
+      copyStatus.textContent = 'Link copied.';
+      setTimeout(() => (copyStatus.textContent = ''), 2500);
+    };
+    try {
+      navigator.clipboard?.writeText(link).then(done, done);
+    } catch {
+      done();
+    }
+  });
+
   return el('div', { class: 'controls', role: 'group', 'aria-label': 'Tamper with the ciphertext' }, [
     el('div', { class: 'control-row' }, [flip, corrupt, reset, regen]),
+    el('div', { class: 'control-row control-presets' }, [
+      el('span', { class: 'toggle-label', text: 'Presets:' }),
+      presetValid,
+      presetFlip,
+      presetTrunc,
+      copyLink,
+      copyStatus,
+    ]),
     status,
   ]);
 }
@@ -641,4 +726,5 @@ export function buildLab(root: HTMLElement): void {
   // Narrate every change through the single announcer, after the panels register.
   subscribers.push(announce);
   announce();
+  writeScenario(); // normalize the URL to the current (possibly linked) scenario
 }

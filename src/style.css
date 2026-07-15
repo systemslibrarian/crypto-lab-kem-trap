@@ -210,6 +210,14 @@ body {
   color: var(--text-dim);
   font-size: 0.9rem;
 }
+.control-presets {
+  margin-top: 0.1rem;
+}
+.copy-status {
+  color: var(--v-accept);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
 .mutation-status {
   margin: 0.25rem 0 0;
   font-weight: 600;
