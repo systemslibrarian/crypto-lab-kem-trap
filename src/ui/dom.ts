@@ -112,7 +112,15 @@ export function verdictBadge(verdict: Verdict, detail?: string): HTMLElement {
   // Not a live region: on-screen results are static once rendered. A single
   // consolidated announcer (see lab.ts) narrates changes for screen readers so
   // one bit-flip does not fire a dozen simultaneous announcements.
-  return el('div', { class: `indicator ${m.cls}`, 'aria-label': `Security verdict: ${m.text}` }, [
+  //
+  // No `aria-label` here. `aria-label` is PROHIBITED on an element with no role,
+  // and a plain <div> has none — the browser discards it, and axe files the
+  // finding under `incomplete` rather than `violations`, so a violations-only
+  // gate never saw it. It was also pure duplication: the badge already spells
+  // out "Security verdict" in its kicker and "ACCEPT"/"REJECT"/"ALARM" in its
+  // text, which is what a screen reader was reading all along. Dropping it also
+  // makes this badge match `cryptoResultBadge`, which never had one.
+  return el('div', { class: `indicator ${m.cls}` }, [
     el('span', { class: 'indicator-kicker', text: 'Security verdict' }),
     el('span', { class: 'indicator-body' }, [
       el('span', { class: 'indicator-icon', 'aria-hidden': 'true', text: m.icon }),

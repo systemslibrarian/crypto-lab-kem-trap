@@ -12,6 +12,17 @@
   --surface: #131a26;
   --surface-2: #1b2434;
   --border: #2c3850;
+  /* CONTROL AND OPERABLE-REGION boundaries. Split out from --border because
+     --border was doing two incompatible jobs: separating panels (decoration,
+     no contrast floor) and delineating buttons and focusable scroll regions
+     (WCAG 2.1 SC 1.4.11, 3:1 floor). Measured from screenshot pixels, a plain
+     .btn at rest was 1.06:1 fill / 1.40:1 border against the controls panel and
+     1.12:1 / 1.49:1 against a lab panel — no visible edge at all. Only the two
+     accent-decorated buttons cleared 3:1, which is why nothing showed up in a
+     spot check. This value clears 3:1 against every surface a control sits on
+     here: --bg, --surface, --surface-2, --code-bg and the accent-tinted
+     controls panel (worst case 3.77:1). */
+  --border-control: #707d99;
   --text: #e9edf6;
   --text-dim: #aab6cc; /* ≥ 4.5:1 on --bg */
   --text-muted: #8593ac;
@@ -36,6 +47,7 @@
   --surface: #ffffff;
   --surface-2: #eef1f8;
   --border: #ccd4e2;
+  --border-control: #737d94; /* worst case 3.65:1 across every light surface */
   --text: #141a28;
   --text-dim: #48536b; /* ≥ 4.5:1 on --bg */
   --text-muted: #5c6884;
@@ -58,6 +70,22 @@ html {
 }
 html[data-theme='light'] {
   background-color: #f5f7fb;
+}
+
+/* Border-box everywhere.
+   The stylesheet shipped without a box-sizing reset, which is not a style
+   preference here — it was a WCAG 1.4.10 (Reflow) failure at phone width on
+   every single state of the page. `.cl-hero-why` takes `width: 100%` below
+   640px and carries `.85rem 1.05rem` of padding plus a 1px border; under
+   content-box that resolves to 100% PLUS 35.6px, so the hero overflowed its own
+   column by exactly that and the document scrolled sideways 401px inside a
+   380px viewport. Only two rules in this file set an explicit width at all
+   (`.vh`, which has no padding or border, and `.oracle-table`, which has
+   neither), so the reset changes nothing else. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 body {
@@ -189,7 +217,7 @@ body {
   font-weight: 600;
   padding: 0.5rem 0.9rem;
   border-radius: 9px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-control);
   background: var(--surface-2);
   color: var(--text);
   cursor: pointer;
@@ -244,7 +272,10 @@ body {
   overflow: auto;
   padding: 0.55rem;
   background: var(--code-bg);
-  border: 1px solid var(--border);
+  /* Focusable (tabindex=0) and keyboard-scrollable, so this box is an operable
+     region and its edge owes 3:1 — its fill sits 1.06-1.18:1 from whatever it
+     is nested in, so the border is the only thing that says where it starts. */
+  border: 1px solid var(--border-control);
   border-radius: 8px;
   font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 0.82rem;
@@ -299,8 +330,13 @@ body {
     transform: none;
   }
 }
+/* The progress rail. Every visible step is either the newly revealed one
+   (accent) or an already-seen one, so these two are the whole signal — and the
+   40% accent/border mix rendered at 1.99:1 (dark) and 2.40:1 (light) against
+   the panel, which is not a rail anybody can see. A neutral slate at 3.65:1+
+   stays clearly distinct from the accent rail while actually being visible. */
 .step.is-done {
-  border-left-color: color-mix(in oklab, var(--accent) 40%, var(--border));
+  border-left-color: var(--border-control);
 }
 .step-title {
   margin: 0 0 0.4rem;
@@ -435,7 +471,7 @@ body {
   border-color: var(--v-alarm);
 }
 .caller-card.verdict-accept {
-  border-color: color-mix(in oklab, var(--v-accept) 55%, var(--border));
+  border-color: color-mix(in oklab, var(--v-accept) 70%, var(--border));
 }
 .caller-name,
 .oracle-name,
@@ -458,7 +494,7 @@ body {
   margin: 0 0 0.9rem;
   padding: 0.85rem 1rem;
   background: var(--code-bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-control); /* focusable scroll region — see .bytes */
   border-radius: 8px;
   overflow: auto;
   font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
@@ -516,8 +552,14 @@ body {
 .oracle-col.is-oracle {
   border-color: var(--v-alarm);
 }
+/* The green half of this panel's headline signal. Its red twin
+   (`.is-oracle`) uses the raw --v-alarm and measures 5.62-7.19:1; this one used
+   a 45% mix and measured 2.64:1 in light — the same asymmetry appears in
+   `.caller-card.verdict-accept` and `.prov-card.prov-agreed`, which use 55% and
+   land on exactly 3.00:1. All three are raised to 70%, which clears 3:1 with
+   margin in both themes without making the accept side as loud as the alarm. */
 .oracle-col.is-uniform {
-  border-color: color-mix(in oklab, var(--v-accept) 45%, var(--border));
+  border-color: color-mix(in oklab, var(--v-accept) 70%, var(--border));
 }
 .oracle-flag {
   display: flex;
@@ -548,7 +590,7 @@ body {
   border-color: var(--v-alarm);
 }
 .prov-card.prov-agreed {
-  border-color: color-mix(in oklab, var(--v-accept) 55%, var(--border));
+  border-color: color-mix(in oklab, var(--v-accept) 70%, var(--border));
 }
 .prov-fact {
   display: flex;
