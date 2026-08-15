@@ -3,6 +3,7 @@ import {
   boot,
   driveAllStates,
   driveLinkedScenario,
+  expectBaselineNotStale,
   NARROW,
   reportCollected,
   watchPageErrors,
@@ -46,6 +47,7 @@ for (const theme of ['dark', 'light'] as const) {
     await driveLinkedScenario(page, theme);
     expect(errors, errors.join('\n')).toEqual([]);
     reportCollected();
+    expectBaselineNotStale();
   });
 
   test(`no WCAG A/AA violations in ${theme} theme at 380px`, async ({ page, context }) => {
@@ -58,5 +60,6 @@ for (const theme of ['dark', 'light'] as const) {
     await driveLinkedScenario(page, `${theme} @380px`);
     expect(errors, errors.join('\n')).toEqual([]);
     reportCollected();
+    expectBaselineNotStale();
   });
 }
