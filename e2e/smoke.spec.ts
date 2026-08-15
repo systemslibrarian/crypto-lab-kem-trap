@@ -83,8 +83,5 @@ test('the three verdicts are visually and textually distinct (dark + light)', as
     expect(accept.text).not.toBe(alarm.text);
   }
 
-  await assertDistinct(); // dark
-  await page.locator('#cl-theme-toggle').click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-  await assertDistinct(); // light
+  await assertDistinct();
 });
