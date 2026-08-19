@@ -33,7 +33,7 @@
     "vitest": "^2.1.5"
   },
   "dependencies": {
-    "@noble/hashes": "^1.6.1",
+    "@noble/hashes": "^2.3.0",
     "@noble/post-quantum": "^0.6.0"
   }
 }
