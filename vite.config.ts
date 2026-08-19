@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 // Real repo name — deployed under this GitHub Pages subpath. Root-absolute
 // asset paths 404 under a project subpath, so all in-page assets use `./` or
