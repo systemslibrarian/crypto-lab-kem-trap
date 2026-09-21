@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
 // so what passes here is what actually ships to GitHub Pages. Run `npm run build`
 // first (CI does).
 const BASE = '/crypto-lab-kem-trap/';
-const PORT = 4657;
+const PORT = 4204;
 const ORIGIN = `http://localhost:${PORT}`;
 
 export default defineConfig({
