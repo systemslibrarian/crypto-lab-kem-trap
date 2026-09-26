@@ -1,7 +1,8 @@
-// The interactive lab. Every panel runs against the real ML-KEM-768 primitive
+// The interactive lab. The attack panels run against the real ML-KEM-768 primitive
 // and the real verifier; the learner's actions (flipping a bit, corrupting the
 // length, choosing what sits in a stale buffer) cause the genuine crypto to
-// produce a genuinely wrong outcome. Nothing here is a canned animation.
+// produce a genuinely wrong outcome. A separate, labelled byte-comparison
+// illustration shows a bug reported in a different ML-KEM-1024 implementation.
 
 import {
   brokenReceiver,
@@ -13,6 +14,7 @@ import {
   type SenderHello,
 } from '../kem/callers.ts';
 import { decapsulateTraced } from '../kem/fo-transform.ts';
+import { compareCiphertexts } from './comparison-model.ts';
 import { keygen, PARAMS } from '../kem/mlkem.ts';
 import type { MlKemKeyPair } from '../kem/types.ts';
 import { byteDiffCount } from '../kem/util.ts';
@@ -371,11 +373,33 @@ function foPanel(): HTMLElement {
   });
   render();
   p.append(
+    incompleteComparisonCaseStudy(),
     scopeNote(
       'the lattice math behind K-PKE.Decrypt (LWE, the NTT) — this lab shows the FO wrapper around it; the lattice internals are in the kyber-vault demo, linked below.',
     ),
   );
   return p;
+}
+
+function incompleteComparisonCaseStudy(): HTMLElement {
+  // Eight schematic bytes keep the failure visible. These are not ML-KEM wire
+  // bytes or a reproduction of the paper's chosen-ciphertext key recovery.
+  const original = Uint8Array.from([0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80]);
+  const changed = Uint8Array.from(original);
+  changed[7] ^= 1;
+  const result = compareCiphertexts(original, changed, 7);
+  return el('details', { class: 'more', id: 'incomplete-comparison' }, [
+    el('summary', { text: 'Research update: what if the comparison skips a byte?' }),
+    el('p', { class: 'note', text: 'Simulated eight-byte illustration: one bit changes in the last byte. Comparing all eight bytes rejects it; a faulty check of only the first seven accepts it.' }),
+    byteView('expected ciphertext (schematic)', original, { limit: 8 }),
+    byteView('received ciphertext (schematic)', changed, { diffAgainst: original, limit: 8 }),
+    el('p', { class: 'note', text: `Full comparison: ${result.fullMatch ? 'MATCH' : 'MISMATCH'}. Truncated comparison: ${result.partialMatch ? 'MATCH (BUG)' : 'MISMATCH'}. The lab’s real ML-KEM-768 decapsulation still compares the entire ciphertext.` }),
+    el('p', { class: 'note' }, [
+      'Das, ',
+      el('a', { href: 'https://eprint.iacr.org/2026/1682', target: '_blank', rel: 'noopener' }, ['ePrint 2026/1682']),
+      ' (preprint, August 15, 2026), reports key recovery from incomplete FO comparisons in affected wolfSSL ML-KEM-1024 AVX2/NEON paths under a chosen-ciphertext oracle. This byte model shows only the comparison failure; it does not reproduce key recovery or establish a break of correct ML-KEM.',
+    ]),
+  ]);
 }
 
 function candidate(label: string, bytes: Uint8Array, chosen: boolean): HTMLElement {
@@ -711,7 +735,7 @@ export function buildLab(root: HTMLElement): void {
       el('h2', { class: 'panel-title', text: 'Break it yourself' }),
       el('p', {
         class: 'panel-lead',
-        text: 'These controls drive every panel below against the real ML-KEM-768 primitive and the real verifier. Flip a bit and watch honest crypto produce a dishonest outcome downstream.',
+        text: 'These controls drive the attack panels below against the real ML-KEM-768 primitive and verifier. Flip a bit and watch honest crypto produce a dishonest outcome downstream. The separate research-update illustration is explicitly simulated.',
       }),
       mutationControls(),
       announcer,

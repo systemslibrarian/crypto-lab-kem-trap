@@ -32,7 +32,7 @@ The subject of this lab is the one thing FIPS 203 §7.3 makes non-negotiable: **
 4. **The oracle a chatty caller hands out** — the SAFE caller answers every failure identically; a verbose broken caller differs across three channels at once (message text, length, and code path / timing). Any one is a plaintext-checking oracle. Flip a bit and watch all three flip. (The timing channel is modeled as control flow, not benchmarked.)
 5. **Provenance** — one ciphertext to Bob; Bob gets the agreed secret, Carol (the wrong recipient) also gets 32 well-formed bytes. "32 bytes arrived" is not "a secret with the intended party" — and the panel *shows* the fix: a confirmation MAC over the transcript verifies for Bob and fails for Carol.
 
-**Break-it-yourself:** the tamper controls (flip a bit, corrupt the length, regenerate keys) drive every panel against the real primitive and the real verifier. The learner *causes* the failure; nothing here is a canned animation.
+**Break-it-yourself:** the tamper controls (flip a bit, corrupt the length, regenerate keys) drive the attack panels against the real primitive and verifier. The separate research-update illustration is a labelled byte-comparison model, not a run against ML-KEM.
 
 ## When to Use It
 
@@ -49,6 +49,7 @@ At the [live demo](https://systemslibrarian.github.io/crypto-lab-kem-trap/) you 
 - **Dropped return code:** `rc` is checked into a variable but never branched on; a malformed ciphertext leaves the output buffer untouched and the session proceeds on whatever was resident.
 - **No confirmation step:** the caller equates "Decaps returned 32 bytes" with "we share the intended key." A bit-flipped ciphertext yields the implicit-rejection secret `K̄`; without an authenticated confirmation MAC, the caller cannot notice the peer holds a different value.
 - **A distinguishable failure response:** a caller that reveals *why* decapsulation failed (error string, length, or timing) becomes a plaintext-checking / decapsulation oracle. **Precise consequence:** such an oracle enables published chosen-ciphertext attacks that recover the ML-KEM **decapsulation (private) key** — a *confidentiality* key. A KEM authenticates nobody, so there is no separate "authentication key" at risk here.
+- **Incomplete FO comparison:** an eight-byte illustration in Panel 1 changes an ignored tail byte; the full comparator rejects it while the deliberately truncated comparator accepts it. [Das, ePrint 2026/1682](https://eprint.iacr.org/2026/1682) (preprint, August 15, 2026) reports key recovery from affected wolfSSL **ML-KEM-1024** AVX2/NEON paths under a chosen-ciphertext oracle. This model does not reproduce that attack or imply a flaw in this lab's real ML-KEM-768 implementation.
 - **Provenance confusion:** treating shared-secret bytes as proof of *who* you're talking to. The bytes carry no identity; binding the secret to the transcript (a confirmation MAC or a key-committing step) is what ties it to a party.
 
 ## Real-World Usage
@@ -72,17 +73,19 @@ npm run preview    # serve the production build
 
 ## Build & Verify
 
-- **25 unit tests** (Vitest) across three files, run in CI before deploy:
+- **45 unit tests** (Vitest) across five files, run in CI before deploy:
   - `src/__tests__/mlkem.test.ts` — round-trips, FIPS 203 lengths, implicit-rejection (never throws on a wrong-but-well-formed ciphertext), and **3 deterministic known-answer vectors** pinned to the ACVP-validated reference (`src/kem/vectors.ts`).
   - `src/__tests__/fo-transform.test.ts` — the transparent FO reconstruction checked **byte-for-byte against the reference `decapsulate`** across valid and tampered ciphertexts, plus `m'` recovery and `J(z‖c)` = SHAKE256(z‖c) verification.
   - `src/__tests__/callers.test.ts` — SAFE uniform rejection + confirmation, BROKEN fail-open on stale buffers, the oracle distinguisher, provenance, and the confirmation-MAC fix (verifies for the intended party, fails for the wrong one).
+  - `src/__tests__/comparison-model.test.ts` — the schematic tail mutation passes only the deliberately truncated comparison, while a changed checked byte fails both.
+  - `src/__tests__/util.test.ts` — byte and encoding helper checks.
 - **Coverage gate:** `npm run test:coverage` enforces thresholds on the cryptographic layer (`src/kem/**`), where correctness is the point — currently **98% statements / 94% branches / 96% functions / 98% lines**, gated at 95/90/95/95. The UI is covered by the e2e suites instead.
 - **Accessibility gate:** `@axe-core/playwright` scans the production build for zero WCAG 2.1 A/AA violations in **both** themes and in **both** a clean and a tampered (ALARM/REJECT) state (`e2e/a11y.spec.ts`); progressively-hidden content is revealed before scanning. A single consolidated live region and `prefers-reduced-motion` support round out the accessibility work.
 - **Cross-browser smoke:** `e2e/smoke.spec.ts` runs on **Chromium, Firefox, WebKit, and a mobile viewport** — asserting the valid / bit-flipped / length-corrupted flows, that the three verdict states (ACCEPT / REJECT / ALARM) stay visually *and* textually distinct in both themes, and that a scenario permalink restores state.
 - **Lint + bundle budget:** ESLint (typescript-eslint) and a gzip bundle budget both run in CI. The GitHub Pages deploy is blocked on any regression across all of the above.
 
 ```bash
-npm test                       # 24 unit tests + KATs
+npm test                       # 45 unit tests, including KATs
 npm run build && npm run test:a11y   # a11y gate, both themes
 ```
 
