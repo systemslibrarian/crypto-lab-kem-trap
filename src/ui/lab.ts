@@ -399,6 +399,11 @@ function incompleteComparisonCaseStudy(): HTMLElement {
       el('a', { href: 'https://eprint.iacr.org/2026/1682', target: '_blank', rel: 'noopener' }, ['ePrint 2026/1682']),
       ' (preprint, August 15, 2026), reports key recovery from incomplete FO comparisons in affected wolfSSL ML-KEM-1024 AVX2/NEON paths under a chosen-ciphertext oracle. This byte model shows only the comparison failure; it does not reproduce key recovery or establish a break of correct ML-KEM.',
     ]),
+    el('p', { class: 'note' }, [
+      'September 27, 2026 extension: ',
+      el('a', { href: 'https://eprint.iacr.org/2026/2239.pdf', target: '_blank', rel: 'noopener' }, ['Das, ePrint 2026/2239 (preprint)']),
+      ' reports recovery on ML-KEM-512/768/1024 with one unverified ciphertext v coordinate, using deliberately faulty comparison simulations on kyber-py. The identifiability theorem assumes a stated regularity condition; recovery costs are empirical and key-dependent. The single-v result does not cover an unchecked u coordinate. Our eight-byte illustration does not reproduce key recovery or show a break of correct ML-KEM.',
+    ]),
   ]);
 }
 

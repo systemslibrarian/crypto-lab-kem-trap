@@ -56,6 +56,8 @@ At the [live demo](https://systemslibrarian.github.io/crypto-lab-kem-trap/) you 
 
 ML-KEM is being deployed now in hybrid TLS 1.3 key exchange, SSH, and messaging. NIST **SP 800-227** (secure use of KEMs) exists precisely because the primitive's guarantees are conditional on correct caller behavior: confirm the shared secret through an authenticated step, handle Decaps uniformly, and never build a distinguishable failure path. The FFI shape modeled here mirrors real integrations against liboqs's `OQS_KEM_decaps`.
 
+**Research extension:** [Das, ePrint 2026/2239](https://eprint.iacr.org/2026/2239.pdf) (preprint, September 27, 2026) extends the earlier tail-comparison case: full key recovery is reported for ML-KEM-512/768/1024 with a single unverified ciphertext **v coordinate**, against deliberately faulty comparison simulations built on kyber-py. The identifiability theorem depends on a stated regularity assumption; recovery costs are empirical and key-dependent. An unchecked u coordinate is not covered by that single-v result. This lab does not reproduce the recovery or show a break of correctly implemented ML-KEM.
+
 ## How to Run Locally
 
 ```bash
