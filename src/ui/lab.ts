@@ -396,15 +396,14 @@ function incompleteComparisonCaseStudy(): HTMLElement {
     el('p', { class: 'note', text: `Full comparison: ${result.fullMatch ? 'MATCH' : 'MISMATCH'}. Truncated comparison: ${result.partialMatch ? 'MATCH (BUG)' : 'MISMATCH'}. The lab’s real ML-KEM-768 decapsulation still compares the entire ciphertext.` }),
     el('p', { class: 'note' }, [
       'Das, ',
-      // Figures quoted from the ePrint ABSTRACT, which is what we could read:
-      // eprint.iacr.org/2026/1682.pdf answers 403 to a plain fetch. The earlier
-      // wording attributed them to "Table 1" and "§§5–6.2", said the NEON run was
-      // "under QEMU", called the reference model's noise "idealized", and reported
-      // that the paper ARGUES oracle exposure through a named deployed protocol
-      // path. None of that is in the abstract and none of it could be checked, so
-      // none of it is displayed. The three numbers themselves are verbatim.
+      // Pointers and qualifiers below are scoped the way the paper scopes them,
+      // which is not uniformly: Table 1 (p. 5) carries both hardware percentages,
+      // but only the NEON run is emulated and the AVX2 run is native. The full-key
+      // figure is a model result rather than a hardware one, and the paper itself
+      // marks that model optimistic. The deployed-protocol reach is the paper’s own
+      // argument, which it twice declines to call demonstrated.
       el('a', { href: 'https://eprint.iacr.org/2026/1682', target: '_blank', rel: 'noopener' }, ['ePrint 2026/1682']),
-      ' (preprint, 15 August 2026), reports partial recovery of the 2048 secret coefficients of ML-KEM-1024 from affected wolfSSL binaries — 98.0% at 400 ciphertexts on the AVX2 backend and 98.5% at 600 on NEON — while its verified reference model recovers all 2048 at about 1300 ciphertexts. Those three figures are quoted from the preprint’s own abstract, which is the part of it we have read. The attack assumes a reused key and a constructed plaintext-checking oracle, and the reported 10^5–10^6 decapsulation queries must target that same key; ciphertext counts are not query counts. The exported keypair is used to score recovery, not as attack input. This page does not show that any deployed protocol exposes the same oracle. This byte model shows only the comparison failure; it does not reproduce key recovery or establish a break of correct ML-KEM.',
+      ' (preprint, 15 August 2026) reports partial recovery of the 2048 secret coefficients of ML-KEM-1024 from affected wolfSSL binaries. Table 1 on p. 5 carries both hardware figures: 98.0% at 400 ciphertexts on the AVX2 backend, which is native x86-64, and 98.5% at 600 on NEON, which is ARM64 under QEMU emulation; §5 on pp. 5–6 describes both runs. The full key is reached in the paper’s compressed kyber-py reference model rather than on hardware, and that model assumes idealized ±q/64 measurement noise: it recovers 2047 of 2048 coefficients by 700 ciphertexts and all 2048 at about 1300 ciphertexts (p. 6). The paper marks those model counts optimistic, because the live measurement noise is not the clean i.i.d. ±q/64 the model assumes. The attack assumes a reused key and a constructed plaintext-checking oracle, and §6.2 on p. 7 requires all 10^5–10^6 decapsulations to land on one key before it rotates; ciphertext counts are not query counts. The exported keypair is used to score recovery, not as attack input. §6.2 argues that HPKE static recipients and KEMTLS long-term keys are reachable when the key is long-lived, and less so under frequent rotation; the paper labels that reach argued, not demonstrated, on pp. 3 and 7. This page does not show that any deployed protocol exposes the same oracle. This byte model shows only the comparison failure; it does not reproduce key recovery or establish a break of correct ML-KEM.',
     ]),
     el('p', { class: 'note' }, [
       'September 27, 2026 extension: ',
