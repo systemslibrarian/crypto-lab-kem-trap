@@ -397,7 +397,7 @@ function incompleteComparisonCaseStudy(): HTMLElement {
     el('p', { class: 'note' }, [
       'Das, ',
       el('a', { href: 'https://eprint.iacr.org/2026/1682', target: '_blank', rel: 'noopener' }, ['ePrint 2026/1682']),
-      ' (preprint, August 15, 2026), reports key recovery from incomplete FO comparisons in affected wolfSSL ML-KEM-1024 AVX2/NEON paths under a chosen-ciphertext oracle. This byte model shows only the comparison failure; it does not reproduce key recovery or establish a break of correct ML-KEM.',
+      ' (preprint, August 15, 2026), reports partial recovery of the 2048 secret coefficients (s, e) from affected wolfSSL ML-KEM-1024 binaries: 98.0% at 400 ciphertexts on native AVX2 and 98.5% at 600 on NEON under QEMU (Table 1). Full recovery of all 2048 coefficients at about 1300 ciphertexts was demonstrated only in a reference model with idealized measurement noise; the shipped-binary runs were not carried to full recovery (§§5–6.2). The attack assumes a reused key and a constructed plaintext-checking oracle that reveals decoded-bit information. The reported 10^5–10^6 decapsulation queries must target that same key; ciphertext counts are not query counts. The exported keypair is used to score recovery, not as attack input. Exposure of the same oracle through a deployed HPKE or KEMTLS AEAD path is argued, not demonstrated. This byte model shows only the comparison failure; it does not reproduce key recovery or establish a break of correct ML-KEM.',
     ]),
     el('p', { class: 'note' }, [
       'September 27, 2026 extension: ',
