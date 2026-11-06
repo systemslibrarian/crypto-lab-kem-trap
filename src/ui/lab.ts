@@ -400,7 +400,7 @@ function incompleteComparisonCaseStudy(): HTMLElement {
       // eprint.iacr.org/2026/1682.pdf answers 403 to a plain fetch. The earlier
       // wording attributed them to "Table 1" and "§§5–6.2", said the NEON run was
       // "under QEMU", called the reference model's noise "idealized", and reported
-      // that the paper ARGUES oracle exposure through a deployed HPKE or KEMTLS
+      // that the paper ARGUES oracle exposure through a named deployed protocol
       // path. None of that is in the abstract and none of it could be checked, so
       // none of it is displayed. The three numbers themselves are verbatim.
       el('a', { href: 'https://eprint.iacr.org/2026/1682', target: '_blank', rel: 'noopener' }, ['ePrint 2026/1682']),
