@@ -15,6 +15,7 @@ import {
 } from '../kem/callers.ts';
 import { decapsulateTraced } from '../kem/fo-transform.ts';
 import { compareCiphertexts } from './comparison-model.ts';
+import { securityMatrix } from './security-matrix.ts';
 import { keygen, PARAMS } from '../kem/mlkem.ts';
 import type { MlKemKeyPair } from '../kem/types.ts';
 import { byteDiffCount } from '../kem/util.ts';
@@ -697,7 +698,7 @@ function provenancePanel(): HTMLElement {
       el('span', { class: 'callout-icon', 'aria-hidden': 'true', text: '🔑' }),
       el('p', {
         html:
-          'The fix, shown above — not asserted: a <strong>confirmation MAC over the transcript</strong>, keyed from each party’s secret, is what binds the bytes to an identity. It verifies for Bob and fails for Carol. Real ML-KEM cannot hand two different keys the same secret, so the collapse never happens in the math — it happens in a caller that reads any 32 bytes as success. Key-committing constructions generalise this — see commit-gate below.',
+          'A <strong>confirmation MAC over the transcript</strong>, keyed from each party’s secret, checks possession of the matching secret for this exchange: it verifies for Bob and fails for Carol. Identifying Bob additionally requires a trusted binding between Bob and his public key; the tag alone does not supply that binding. A caller that reads any 32 bytes as success skips the possession check entirely. Key-committing constructions address a separate property — see commit-gate below.',
       }),
     ]),
     scopeNote('a full authenticated key exchange. Provenance here is one lesson; building the handshake around it is a separate demo.'),
@@ -756,6 +757,7 @@ export function buildLab(root: HTMLElement): void {
     bufferPanel(),
     oraclePanel(),
     provenancePanel(),
+    securityMatrix(),
   );
 
   // Narrate every change through the single announcer, after the panels register.

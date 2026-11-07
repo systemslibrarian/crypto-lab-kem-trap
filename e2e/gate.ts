@@ -206,7 +206,12 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
   // writes, so both themes are checkable by attribute here.
   await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
 
-  await expect(page.locator('#app .panel')).toHaveCount(5);
+  // Pin the full set so a missing experiment cannot be replaced by an
+  // unrelated panel while keeping the same count. Panel 6 is the reading map.
+  await expect(page.locator('#app .panel')).toHaveCount(6);
+  expect(await page.locator('#app .panel').evaluateAll(nodes => nodes.map(node => node.id))).toEqual([
+    'fo', 'callers', 'buffer', 'oracle', 'provenance', 'security-properties',
+  ]);
   await expect(page.locator('.cl-hero-title')).toHaveText('KEM Trap');
 
   // Shipped defaults, asserted.

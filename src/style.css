@@ -96,6 +96,16 @@ body {
   line-height: 1.55;
 }
 
+.matrix-label { display: block; margin-bottom: .5rem; font-weight: 600; }
+#security-focus { min-height: 44px; max-width: 100%; padding: .5rem; font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--border-control); border-radius: 6px; }
+.matrix-scroll { max-width: 100%; overflow-x: auto; margin: 1rem 0; }
+.security-matrix { border-collapse: collapse; min-width: 960px; width: 100%; font-size: .9rem; }
+.security-matrix caption { text-align: left; font-weight: 600; padding-bottom: .75rem; }
+.security-matrix th, .security-matrix td { padding: .8rem; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+.security-matrix th { font-weight: 600; }
+.security-matrix td p { margin: 0 0 .65rem; }
+.matrix-links { display: grid; gap: .6rem; }
+
 /* Base rules scoped to #app so they never fight the always-dark shared top bar. */
 #app {
   display: block;
