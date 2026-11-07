@@ -4,6 +4,22 @@
 
 **Live demo:** https://systemslibrarian.github.io/crypto-lab-kem-trap/
 
+## Security-property matrix
+
+Panel 6 connects six scenarios to the property at issue, required attacker access,
+evidence and limits. Filter by confidentiality, agreement or peer authentication.
+Algorithm security, executed browser examples, a schematic fault and published
+hardware experiments remain distinct; this is not a security-rating table or a
+new attack implementation. The existing research note retains its binary/model
+qualifications and query-budget caveats.
+
+Key confirmation establishes matching-secret possession in the modeled exchange;
+peer identity additionally requires a trusted public-key binding and suitable
+protocol. Sources: [FIPS 203](https://doi.org/10.6028/NIST.FIPS.203),
+[SP 800-227](https://doi.org/10.6028/NIST.SP.800-227),
+[incomplete-comparison research](https://eprint.iacr.org/2026/1682), and
+[KyberSlash](https://eprint.iacr.org/2024/1049).
+
 ## What It Is
 
 A KEM (key-encapsulation mechanism) lets two parties agree on a shared secret: one side encapsulates a fresh secret under the other's public key, the other decapsulates it. **ML-KEM-768** is the post-quantum KEM standardized in **FIPS 203** (Category 3, `1184`-byte public key / `2400`-byte secret key / `1088`-byte ciphertext / `32`-byte secret).
