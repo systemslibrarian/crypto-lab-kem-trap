@@ -20,7 +20,7 @@ const hero = el('header', { class: 'cl-hero' }, [
     el('span', { class: 'cl-hero-why-label', text: 'WHY IT MATTERS' }),
     el('p', {
       class: 'cl-hero-why-text',
-      text: 'Post-quantum KEMs are shipping into TLS, SSH, and messaging now. Decaps returns 32 bytes for any ciphertext by design, so a single mishandled return value turns an unbreakable primitive into a silently broken system.',
+      text: 'Post-quantum KEMs are shipping into TLS, SSH, and messaging now. Decaps returns 32 bytes for any ciphertext by design, so a single mishandled return value turns a primitive with no known attack into a silently broken system.',
     }),
   ]),
 ]);

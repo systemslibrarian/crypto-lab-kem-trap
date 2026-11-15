@@ -1,6 +1,6 @@
 // The headline mechanism, made inspectable.
 //
-// ML-KEM's Decapsulation is a Fujisaki–Okamoto (FO) transform (FIPS 203 §7.3,
+// ML-KEM's Decapsulation is a Fujisaki–Okamoto (FO) transform (FIPS 203 §6.3,
 // Algorithm 18). The library computes it and hands back 32 bytes. To *show* the
 // branch — decrypt, re-encrypt, compare, and on mismatch return the pseudorandom
 // implicit-rejection secret instead of erroring — we reconstruct the same
