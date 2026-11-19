@@ -801,7 +801,18 @@ function malformedPanel(): HTMLElement {
       kv('Different public key', r.differentPublicKey ? 'ek₀ ≠ ek₁' : 'same', 'accept'),
       kv('It is the implicit-rejection secret', r.isImplicitReject ? 'K = J(z ‖ c), the FO rejection branch' : 'no', 'accept'),
       kv('FIPS 203 hash check on BOTH keys', r.hashCheckPassesBoth ? 'PASSES — it cannot see this' : 'rejects', r.hashCheckPassesBoth ? 'alarm' : 'accept'),
-      el('p', { class: 'panel-note', text: 'The keys are internally consistent (each h still equals its own H(ek)); only the implicit-rejection seed z is shared, and the rejection secret J(z ‖ c) never involves the public key. The hash check does nothing here. What stops it is binding the public key into the shared secret at the PROTOCOL level — a confirmation MAC over the transcript, as in act 5.' }),
+      el('div', { class: 'prov-grid' }, [
+        el('div', { class: 'prov-card prov-agreed' }, [
+          el('h4', { class: 'prov-name', text: 'The fix — bind ek₀: HKDF(K₀, ek₀ ‖ c)' }),
+          byteView('K₀ with public key bound in', r.K0Bound, { limit: 16 }),
+        ]),
+        el('div', { class: 'prov-card prov-agreed' }, [
+          el('h4', { class: 'prov-name', text: 'The fix — bind ek₁: HKDF(K₁, ek₁ ‖ c)' }),
+          byteView('K₁ with public key bound in', r.K1Bound, { diffAgainst: r.K0Bound, limit: 16 }),
+        ]),
+      ]),
+      kv('With the public key bound in', r.boundKeysDiffer ? 'K₀ bound ≠ K₁ bound — the collision is broken' : 'still equal', r.boundKeysDiffer ? 'accept' : 'alarm'),
+      el('p', { class: 'panel-note', text: 'The keys are internally consistent (each h still equals its own H(ek)); only the implicit-rejection seed z is shared, and the rejection secret J(z ‖ c) never involves the public key, so the FIPS 203 hash check cannot see this. The fix is to bind the public key into the derived session key: HKDF(shared secret, ek ‖ c) above differs for the two keys because ek₀ ≠ ek₁, even though the raw secret is identical (Schmieg, “Unbindable Kemmy Schmidt”, 2024). Act 5’s confirmation MAC does NOT supply this — its transcript is the ciphertext only, so two keys that share one secret and one ciphertext would still agree there.' }),
     );
   };
   const renderCoin = (): void => {
@@ -836,7 +847,7 @@ function malformedPanel(): HTMLElement {
       el('div', { class: 'button-row' }, [button('Derive K from the coin only', renderCoin)]),
       coinOut,
     ]),
-    scopeNote('a protocol. These are properties of the KEM primitive against malicious keys; a deployment binds the public key into the transcript (act 5) and validates keys it did not generate (FIPS 203 §7.3).'),
+    scopeNote('a protocol. These are properties of the KEM primitive against malicious keys; a deployment that needs binding mixes the public key into the derived key (shown above, and NOT what act 5’s ciphertext-only confirmation MAC does) and validates keys it did not generate (FIPS 203 §7.3).'),
   );
   return p;
 }

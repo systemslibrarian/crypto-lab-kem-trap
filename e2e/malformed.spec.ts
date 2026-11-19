@@ -38,6 +38,12 @@ test('MAL-BIND-K-PK is shown as a collision the hash check cannot see', async ({
   await expect(panel.getByText('J(z ‖ c), the FO rejection branch')).toBeVisible();
   // The hash check PASSES on both keys here — it is the wrong defence for K-PK.
   await expect(panel.getByText('PASSES — it cannot see this')).toBeVisible();
+  // The fix is SHOWN, not asserted: binding the public key into the KDF breaks
+  // the collision. The false "act 5 fixes this" credit must not be there.
+  await expect(panel.getByText('K₀ bound ≠ K₁ bound — the collision is broken')).toBeVisible();
+  await expect(panel.getByText(/HKDF\(shared secret, ek ‖ c\)/)).toBeVisible();
+  const noteText = (await panel.textContent()) ?? '';
+  expect(noteText).not.toMatch(/binding the public key into the shared secret at the PROTOCOL level — a confirmation MAC over the transcript, as in act 5/);
 });
 
 test('the encapsulation coin alone is shown to be the key', async ({ page }) => {

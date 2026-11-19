@@ -14,6 +14,10 @@ import {
 } from '../kem/malformed.ts';
 import { toHex, bytesEqual } from '../kem/util.ts';
 import { VECTORS } from '../kem/vectors.ts';
+import { ACVP_ML_KEM_768 } from '../kem/acvp-vectors.ts';
+import { decapsulateTraced } from '../kem/fo-transform.ts';
+
+const fromHex = (s: string): Uint8Array => Uint8Array.from(s.match(/../g)!.map((b) => parseInt(b, 16)));
 
 describe('K-PKE.Encrypt reconstruction (KAT vs reference)', () => {
   it('reproduces ml_kem768.encapsulate’s ciphertext byte-for-byte', () => {
@@ -80,6 +84,19 @@ describe('Algorithm 3 — MAL-BIND-K-PK (shared implicit-rejection seed)', () =>
     // Whereas tampering h breaks the check.
     expect(fipsHashCheck(tamperHash(dk, sha3_256(crypto.getRandomValues(new Uint8Array(1184)))))).toBe(false);
   });
+
+  it('binding the public key into the KDF breaks the collision (the shown fix)', () => {
+    for (let i = 0; i < 5; i++) {
+      const r = malBindKPk();
+      // Raw secrets collide, but the public keys differ…
+      expect(r.sameSecret).toBe(true);
+      expect(r.differentPublicKey).toBe(true);
+      // …so HKDF(secret, ek‖c) separates them. This is what act 5's
+      // ciphertext-only confirmation MAC does NOT do.
+      expect(r.boundKeysDiffer).toBe(true);
+      expect(bytesEqual(r.K0Bound, r.K1Bound)).toBe(false);
+    }
+  });
 });
 
 describe('the encapsulation coin is the key', () => {
@@ -100,5 +117,33 @@ describe('hField accessor', () => {
     const dk = keygen().secretKey;
     const ek = dk.subarray(PARAMS.dkPkeBytes, PARAMS.dkPkeBytes + PARAMS.publicKey);
     expect(toHex(hField(dk))).toBe(toHex(sha3_256(ek)));
+  });
+});
+
+// Official NIST ACVP ML-KEM-768 known-answer vector (not a self-chosen seed):
+// the bytes NIST publishes, reproduced by BOTH the @noble reference and this
+// lab's own transparent FO reconstruction. See src/kem/acvp-vectors.ts.
+describe('NIST ACVP ML-KEM-768 known-answer vector', () => {
+  const v = ACVP_ML_KEM_768;
+  const ek = fromHex(v.ek);
+  const dk = fromHex(v.dk);
+  const m = fromHex(v.m);
+  const c = fromHex(v.c);
+  const k = fromHex(v.k);
+
+  it('the reference encapsulate(ek, m) yields NIST’s ciphertext and shared secret', () => {
+    const enc = ml_kem768.encapsulate(ek, m);
+    expect(toHex(enc.cipherText)).toBe(v.c);
+    expect(toHex(enc.sharedSecret)).toBe(v.k);
+  });
+
+  it('the reference decapsulate(c, dk) yields NIST’s shared secret', () => {
+    expect(toHex(ml_kem768.decapsulate(c, dk))).toBe(v.k);
+  });
+
+  it('the lab’s own transparent FO reconstruction yields NIST’s shared secret', () => {
+    // decapsulateTraced is the hand-rolled K-PKE.Decrypt + re-encrypt + J(z‖c)
+    // the exhibits animate; against the official vector it must return exactly k.
+    expect(bytesEqual(decapsulateTraced(c, dk).sharedSecret, k)).toBe(true);
   });
 });

@@ -71,7 +71,7 @@ const rows: EvidenceRow[] = [
 ];
 
 export function securityMatrix(): HTMLElement {
-  const section = panel('security-properties', '6 · Kyber / ML-KEM security-property matrix',
+  const section = panel('security-properties', '7 · Kyber / ML-KEM security-property matrix',
     'Start with the property, then ask what the attacker can observe and what was actually demonstrated. These rows are evidence categories, not security scores.');
   const summary = el('p', { class: 'note', role: 'status', 'aria-live': 'polite' });
   const body = el('tbody');

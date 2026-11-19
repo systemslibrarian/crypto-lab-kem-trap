@@ -16,10 +16,28 @@
 // key; the attack ciphertexts are real K-PKE encryptions (kpke-encrypt.ts, KAT
 // against the reference).
 import { ml_kem768 } from '@noble/post-quantum/ml-kem.js';
+import { hkdf } from '@noble/hashes/hkdf.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 import { keygen, PARAMS } from './mlkem.ts';
 import { decapsulateTraced } from './fo-transform.ts';
 import { H, J, deriveKr, kPkeEncryptWithRandomness } from './kpke-encrypt.ts';
 import { bytesEqual } from './util.ts';
+
+/**
+ * The binding fix, shown rather than asserted: derive the session key from the
+ * shared secret AND the public key (and ciphertext). K = HKDF(ss, info = ek‖c).
+ * This is the binding ML-KEM's bare shared secret does not provide — recommended
+ * for KEMs that need it (Schmieg, "Unbindable Kemmy Schmidt", 2024; Cremers,
+ * Dax & Medinger, "Keeping Up with the KEMs", 2024). Act 5's confirmation MAC
+ * does NOT do this: its transcript is the ciphertext only, so two keys with one
+ * shared secret and one ciphertext still agree.
+ */
+export function bindPublicKey(sharedSecret: Uint8Array, ek: Uint8Array, ciphertext: Uint8Array): Uint8Array {
+  const info = new Uint8Array(ek.length + ciphertext.length);
+  info.set(ek, 0);
+  info.set(ciphertext, ek.length);
+  return hkdf(sha256, sharedSecret, undefined, info, 32);
+}
 
 // FIPS 203 decapsulation-key layout: dk = dkPKE ‖ ek ‖ H(ek) ‖ z.
 const EK_OFFSET = PARAMS.dkPkeBytes; // 1152
@@ -154,6 +172,12 @@ export interface MalBindKPk {
   hashCheckPassesBoth: boolean;
   /** The shared secret is the implicit-rejection value J(z ‖ c). */
   isImplicitReject: boolean;
+  /** Party 0's session key once the public key is bound in: HKDF(K0, ek0‖c). */
+  K0Bound: Uint8Array;
+  /** Party 1's session key once the public key is bound in: HKDF(K1, ek1‖c). */
+  K1Bound: Uint8Array;
+  /** The fix: with the public key bound in, the two keys DIFFER (ek0 ≠ ek1). */
+  boundKeysDiffer: boolean;
 }
 
 /**
@@ -163,8 +187,8 @@ export interface MalBindKPk {
  * ciphertext c fails re-encryption under both, so both decapsulate to the
  * implicit-rejection secret J(z ‖ c) — the same key, under different public
  * keys, and the hash check cannot see it because z never involves the public
- * key. What stops it: binding the public key into the shared secret at the
- * protocol level.
+ * key. What stops it: binding the public key into the derived session key
+ * (bindPublicKey) — K0Bound ≠ K1Bound because ek0 ≠ ek1, even though K0 = K1.
  */
 export function malBindKPk(): MalBindKPk {
   const p0 = keygen();
@@ -180,6 +204,11 @@ export function malBindKPk(): MalBindKPk {
   const K1 = ml_kem768.decapsulate(c, dk1);
   const kBar = J(Uint8Array.from([...z, ...c]));
 
+  // The fix, computed here: bind each party's own public key into the session
+  // key. The raw secrets collide (K0 = K1) but the bound keys do not.
+  const K0Bound = bindPublicKey(K0, p0.publicKey, c);
+  const K1Bound = bindPublicKey(K1, p1.publicKey, c);
+
   return {
     ek0: p0.publicKey,
     ek1: p1.publicKey,
@@ -191,6 +220,9 @@ export function malBindKPk(): MalBindKPk {
     differentPublicKey: !bytesEqual(p0.publicKey, p1.publicKey),
     hashCheckPassesBoth: fipsHashCheck(dk0) && fipsHashCheck(dk1),
     isImplicitReject: bytesEqual(K0, kBar),
+    K0Bound,
+    K1Bound,
+    boundKeysDiffer: !bytesEqual(K0Bound, K1Bound),
   };
 }
 

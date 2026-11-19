@@ -49,6 +49,9 @@ The subject of this lab is the one thing FIPS 203 §6.3 (Algorithm 18, `ML-KEM.D
 3. **The fail-open output buffer** — the scoped centerpiece, modeled on a real FFI shape: `rc` captured but never branched on, `derive_session_key(ss)` run regardless. Watch the 32-byte buffer hold stack garbage or a previous call's secret, then watch the session key on it when Decaps rejects a malformed ciphertext and leaves the buffer untouched.
 4. **The oracle a chatty caller hands out** — the SAFE caller answers every failure identically; a verbose broken caller differs across three channels at once (message text, length, and code path / timing). Any one is a plaintext-checking oracle. Flip a bit and watch all three flip. (The timing channel is modeled as control flow, not benchmarked.)
 5. **Provenance** — one ciphertext to Bob; Bob gets the agreed secret, Carol (the wrong recipient) also gets 32 well-formed bytes. "32 bytes arrived" is not "a secret with the intended party" — and the panel *shows* the fix: a confirmation MAC over the transcript verifies for Bob and fails for Carol.
+6. **Keys that bind nothing** — ML-KEM is neither MAL-BIND-K-CT nor MAL-BIND-K-PK against a *maliciously built* decapsulation key (Schmieg, "Unbindable Kemmy Schmidt", 2024). One shared secret is recovered from two different ciphertexts and two different public keys: the FIPS 203 §7.3 hash check catches the first (and `@noble` enforces it, so real ML-KEM-768 is not vulnerable to that one), while the second collides through a shared implicit-rejection seed `z` the hash check cannot see. The fix — binding the public key into the derived key, `HKDF(ss, ek‖c)` — is *shown*: the two keys differ once `ek` is mixed in, which act 5's ciphertext-only confirmation MAC does not do.
+
+The **Kyber / ML-KEM security-property matrix** panel then summarises the properties by attacker access and what was actually demonstrated.
 
 **Break-it-yourself:** the tamper controls (flip a bit, corrupt the length, regenerate keys) drive the attack panels against the real primitive and verifier. The separate research-update illustration is a labelled byte-comparison model, not a run against ML-KEM.
 
@@ -93,8 +96,9 @@ npm run preview    # serve the production build
 
 ## Build & Verify
 
-- **45 unit tests** (Vitest) across five files, run in CI before deploy:
+- **60 unit tests** (Vitest) across seven files, run in CI before deploy:
   - `src/__tests__/mlkem.test.ts` — round-trips, FIPS 203 lengths, implicit-rejection (never throws on a wrong-but-well-formed ciphertext), and **3 deterministic known-answer vectors** pinned to the ACVP-validated reference (`src/kem/vectors.ts`).
+  - `src/__tests__/malformed.test.ts` — the MAL-BIND exhibit (act 6): the two collisions on real ML-KEM-768, the §7.3 hash check, the public-key-binding fix, and an **official NIST ACVP ML-KEM-768 known-answer vector** (`src/kem/acvp-vectors.ts`) reproduced by both the reference and this lab's own FO reconstruction.
   - `src/__tests__/fo-transform.test.ts` — the transparent FO reconstruction checked **byte-for-byte against the reference `decapsulate`** across valid and tampered ciphertexts, plus `m'` recovery and `J(z‖c)` = SHAKE256(z‖c) verification.
   - `src/__tests__/callers.test.ts` — SAFE uniform rejection + confirmation, BROKEN fail-open on stale buffers, the oracle distinguisher, provenance, and the confirmation-MAC fix (verifies for the intended party, fails for the wrong one).
   - `src/__tests__/comparison-model.test.ts` — the schematic tail mutation passes only the deliberately truncated comparison, while a changed checked byte fails both.
@@ -105,7 +109,7 @@ npm run preview    # serve the production build
 - **Lint + bundle budget:** ESLint (typescript-eslint) and a gzip bundle budget both run in CI. The GitHub Pages deploy is blocked on any regression across all of the above.
 
 ```bash
-npm test                       # 45 unit tests, including KATs
+npm test                       # 60 unit tests, including official ACVP KATs
 npm run build && npm run test:a11y   # a11y gate, both themes
 ```
 
