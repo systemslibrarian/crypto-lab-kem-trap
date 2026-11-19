@@ -14,6 +14,7 @@ import {
   type SenderHello,
 } from '../kem/callers.ts';
 import { decapsulateTraced } from '../kem/fo-transform.ts';
+import { coinToKey, malBindKCt, malBindKPk, type MalBindKCt, type MalBindKPk } from '../kem/malformed.ts';
 import { compareCiphertexts } from './comparison-model.ts';
 import { securityMatrix } from './security-matrix.ts';
 import { keygen, PARAMS } from '../kem/mlkem.ts';
@@ -738,6 +739,108 @@ function provCard(
   ]);
 }
 
+function kv(label: string, value: string, tone?: 'accept' | 'alarm'): HTMLElement {
+  return el('div', { class: `indicator${tone ? ' v-' + tone : ''}` }, [
+    el('span', { class: 'indicator-kicker', text: label }),
+    el('span', { class: 'indicator-body' }, [
+      el('span', { class: 'indicator-icon', 'aria-hidden': 'true', text: tone === 'accept' ? '✓' : tone === 'alarm' ? '✗' : '•' }),
+      el('span', { class: 'indicator-text', text: value }),
+    ]),
+  ]);
+}
+
+function malformedPanel(): HTMLElement {
+  const p = panel(
+    'malformed',
+    '6 · Keys that bind nothing',
+    'A shared secret is supposed to pin down the ciphertext and the public key that made it. Against a maliciously built decapsulation key, ML-KEM pins down neither — Schmieg, “Unbindable Kemmy Schmidt” (2024). The keys below are real ML-KEM-768 keys with one documented byte field edited; every secret is a real decapsulation.',
+  );
+
+  const ctOut = el('div', { class: 'malformed-out', id: 'malformed-ct-out' });
+  const pkOut = el('div', { class: 'malformed-out', id: 'malformed-pk-out' });
+  const coinOut = el('div', { class: 'malformed-out', id: 'malformed-coin-out' });
+
+  const renderCt = (r: MalBindKCt): void => {
+    clear(ctOut);
+    ctOut.append(
+      el('div', { class: 'prov-grid' }, [
+        el('div', { class: 'prov-card' }, [
+          el('h4', { class: 'prov-name', text: 'Party 0 — honest encapsulation to ek₀' }),
+          byteView('c₀ (party 0’s ciphertext)', r.c0, { limit: 12 }),
+          byteView('K₀', r.K0, { limit: 16 }),
+        ]),
+        el('div', { class: 'prov-card' }, [
+          el('h4', { class: 'prov-name', text: 'Party 1 — decaps c₁ under a key whose h = H(ek₀)' }),
+          byteView('c₁ (a different ciphertext)', r.c1, { diffAgainst: r.c0, limit: 12 }),
+          byteView('K₁', r.K1, { diffAgainst: r.K0, limit: 16 }),
+        ]),
+      ]),
+      kv('Same shared secret', r.sameSecret ? 'K₀ = K₁, byte for byte' : 'different', r.sameSecret ? 'alarm' : 'accept'),
+      kv('Different ciphertext', r.differentCiphertext ? 'c₀ ≠ c₁' : 'same', 'accept'),
+      kv('Different public key', r.differentPublicKey ? 'ek₀ ≠ ek₁' : 'same', 'accept'),
+      el('p', { class: 'panel-note', text: 'Bound? No. One secret, two ciphertexts, two public keys — MAL-BIND-K-CT fails. This decaps is the lab’s transparent FO, which follows Algorithm 18 without the §7.3 input check.' }),
+      kv('FIPS 203 §7.3 hash check (re-hash ek, compare to stored h)', r.hashCheckRejects ? 'REJECTS the tampered key — the mitigation' : 'passes', r.hashCheckRejects ? 'accept' : 'alarm'),
+      kv('@noble’s decapsulate enforces that check', r.libraryEnforcesCheck ? 'throws on the tampered key — real ML-KEM-768 here is not vulnerable to this one' : 'does not', r.libraryEnforcesCheck ? 'accept' : 'alarm'),
+    );
+  };
+  const renderPk = (r: MalBindKPk): void => {
+    clear(pkOut);
+    pkOut.append(
+      el('div', { class: 'prov-grid' }, [
+        el('div', { class: 'prov-card' }, [
+          el('h4', { class: 'prov-name', text: 'Key 0 (ek₀), seed z' }),
+          byteView('K₀ = J(z ‖ c)', r.K0, { limit: 16 }),
+        ]),
+        el('div', { class: 'prov-card' }, [
+          el('h4', { class: 'prov-name', text: 'Key 1 (ek₁), the SAME seed z' }),
+          byteView('K₁ = J(z ‖ c)', r.K1, { diffAgainst: r.K0, limit: 16 }),
+        ]),
+      ]),
+      byteView('the one random ciphertext c, decapsulated under both', r.c, { limit: 12 }),
+      kv('Same shared secret', r.sameSecret ? 'K₀ = K₁' : 'different', r.sameSecret ? 'alarm' : 'accept'),
+      kv('Different public key', r.differentPublicKey ? 'ek₀ ≠ ek₁' : 'same', 'accept'),
+      kv('It is the implicit-rejection secret', r.isImplicitReject ? 'K = J(z ‖ c), the FO rejection branch' : 'no', 'accept'),
+      kv('FIPS 203 hash check on BOTH keys', r.hashCheckPassesBoth ? 'PASSES — it cannot see this' : 'rejects', r.hashCheckPassesBoth ? 'alarm' : 'accept'),
+      el('p', { class: 'panel-note', text: 'The keys are internally consistent (each h still equals its own H(ek)); only the implicit-rejection seed z is shared, and the rejection secret J(z ‖ c) never involves the public key. The hash check does nothing here. What stops it is binding the public key into the shared secret at the PROTOCOL level — a confirmation MAC over the transcript, as in act 5.' }),
+    );
+  };
+  const renderCoin = (): void => {
+    clear(coinOut);
+    const r = coinToKey(state.bob.publicKey);
+    coinOut.append(
+      byteView('m (the 32-byte encapsulation coin)', r.m, { limit: 16 }),
+      byteView('K = G(m ‖ H(ek))[:32], from the coin and the public key alone', r.keyFromCoin, { limit: 16 }),
+      byteView('K from a real encapsulation of the same m', r.keyFromEncaps, { diffAgainst: r.keyFromCoin, limit: 16 }),
+      kv('The coin IS the key', r.matches ? 'identical — no ciphertext needed' : 'differ', r.matches ? 'alarm' : 'accept'),
+      el('p', { class: 'panel-note', text: 'K = G(m ‖ H(ek)) is fixed before the ciphertext exists (Tehrani, Buchanan & Lemoudden). Whoever learns the coin m has the session key. A generator that quietly makes m predictable is externally invisible and parameter-controlled — the Dual_EC_DRBG shape the Corrupted Oracle lab draws out.' }),
+    );
+  };
+
+  renderCt(malBindKCt());
+  renderPk(malBindKPk());
+  renderCoin();
+
+  p.append(
+    el('div', { class: 'callout' }, [
+      el('h3', { class: 'callout-title', text: 'Algorithm 2 — MAL-BIND-K-CT: one secret, two ciphertexts' }),
+      el('div', { class: 'button-row' }, [button('Run with fresh keys', () => renderCt(malBindKCt()))]),
+      ctOut,
+    ]),
+    el('div', { class: 'callout' }, [
+      el('h3', { class: 'callout-title', text: 'Algorithm 3 — MAL-BIND-K-PK: one secret, two public keys' }),
+      el('div', { class: 'button-row' }, [button('Run with fresh keys', () => renderPk(malBindKPk()))]),
+      pkOut,
+    ]),
+    el('div', { class: 'callout' }, [
+      el('h3', { class: 'callout-title', text: 'The encapsulation coin is the key' }),
+      el('div', { class: 'button-row' }, [button('Derive K from the coin only', renderCoin)]),
+      coinOut,
+    ]),
+    scopeNote('a protocol. These are properties of the KEM primitive against malicious keys; a deployment binds the public key into the transcript (act 5) and validates keys it did not generate (FIPS 203 §7.3).'),
+  );
+  return p;
+}
+
 export function buildLab(root: HTMLElement): void {
   // The one screen-reader live region for the whole lab.
   announcer = el('div', { class: 'vh', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' });
@@ -757,6 +860,7 @@ export function buildLab(root: HTMLElement): void {
     bufferPanel(),
     oraclePanel(),
     provenancePanel(),
+    malformedPanel(),
     securityMatrix(),
   );
 

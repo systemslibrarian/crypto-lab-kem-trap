@@ -11,18 +11,24 @@
 //     tested math surfaces (`__tests`: ByteDecode/Decompress/NTT/…). The library
 //     does not export this subroutine, and it is exactly the inspectable internal
 //     the lab teaches, so we build it in the open.
-//   - Re-encryption + K̂ derivation reuse the real `ml_kem768.encapsulate(ek, m')`,
-//     which IS G(m'‖H(ek)) followed by K-PKE.Encrypt — identical to what Decaps
-//     does internally.
+//   - Re-encryption + K̂ derivation follow FIPS 203 Algorithm 18 exactly: the
+//     randomness and candidate key come from G(m' ‖ h), where h is the hash READ
+//     FROM THE DECAPSULATION KEY (dk[768k+32 : 768k+64]), not recomputed as H(ek).
+//     For a well-formed key h = H(ek) so the two agree; but Algorithm 18 uses the
+//     stored h, and so must this trace, or a malformed key whose h ≠ H(ek) (see
+//     src/kem/malformed.ts) would trace a different branch than the reference
+//     takes. The K-PKE.Encrypt is kpke-encrypt.ts, KAT-checked against the
+//     reference, because it must encrypt under this derived r.
 //   - K̄ = J(z‖c) is the real SHAKE256 call (FIPS 203's function J).
 //
 // This reconstruction is not trusted on faith: `fo-transform.test.ts` asserts it
 // equals `ml_kem768.decapsulate` byte-for-byte across many valid and tampered
 // ciphertexts. If it ever diverged, the build would fail.
 
-import { __tests, ml_kem768 } from '@noble/post-quantum/ml-kem.js';
+import { __tests } from '@noble/post-quantum/ml-kem.js';
 import { shake256 } from '@noble/hashes/sha3.js';
 import { PARAMS } from './mlkem.ts';
+import { deriveKr, kPkeEncryptWithRandomness } from './kpke-encrypt.ts';
 import type { DecapsTrace } from './types.ts';
 
 const Q = 3329;
@@ -109,15 +115,17 @@ export function decapsulateTraced(ciphertext: Uint8Array, secretKey: Uint8Array)
   const { dkPkeBytes, publicKey: ekLen } = PARAMS;
   const dkPke = secretKey.subarray(0, dkPkeBytes);
   const ek = secretKey.subarray(dkPkeBytes, dkPkeBytes + ekLen);
+  // FIPS 203 Algorithm 18 line 3: h is READ from the key, not recomputed.
+  const h = secretKey.subarray(dkPkeBytes + ekLen, dkPkeBytes + ekLen + 32);
   const z = secretKey.subarray(secretKey.length - 32);
 
   const mPrime = kPkeDecrypt(ciphertext, dkPke);
 
-  // Re-encrypt m' under the real encapsulation: this is G(m'‖H(ek)) then
-  // K-PKE.Encrypt, giving both the candidate ciphertext c' and the "real" key K̂.
-  const re = ml_kem768.encapsulate(ek, mPrime);
-  const reencrypted: Uint8Array = re.cipherText;
-  const kHat: Uint8Array = re.sharedSecret;
+  // Re-encrypt m' as Algorithm 18 does: (K̂, r') = G(m' ‖ h) with the STORED h,
+  // then c' = K-PKE.Encrypt(ek, m', r'). For a well-formed key h = H(ek); for a
+  // malformed key it is whatever the key stores — the branch the reference takes.
+  const { sharedSecret: kHat, randomness } = deriveKr(mPrime, h);
+  const reencrypted: Uint8Array = kPkeEncryptWithRandomness(ek, mPrime, randomness);
 
   const kBar = implicitRejectSecret(z, ciphertext);
   const ciphertextsMatch = bytesEqual(reencrypted, ciphertext);

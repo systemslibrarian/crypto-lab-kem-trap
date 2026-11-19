@@ -691,3 +691,18 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Act 6 (malformed keys): the shared .callout is a flex ROW (a small icon beside
+   an aside). These sections reuse the box but hold a heading, a control row and a
+   results grid instead, so they must stack in a COLUMN — laid out as a row, the
+   .prov-grid's min track forces the panel wider than a 320px viewport, and its
+   overflow escapes up to the document (every byte view already scrolls on its
+   own). align-items:stretch lets the children take the panel width and shrink. */
+#malformed .callout {
+  flex-direction: column;
+  align-items: stretch;
+}
+#malformed .callout > * { min-width: 0; }
+.malformed-out { min-width: 0; }
+.panel-note { font-size: 0.86rem; color: var(--text-dim); margin: 0.5rem 0 0; }
+.callout-title { font-size: 0.98rem; margin: 0 0 0.5rem; }

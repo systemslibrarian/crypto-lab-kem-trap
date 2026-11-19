@@ -211,10 +211,10 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
   await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
 
   // Pin the full set so a missing experiment cannot be replaced by an
-  // unrelated panel while keeping the same count. Panel 6 is the reading map.
-  await expect(page.locator('#app .panel')).toHaveCount(6);
+  // unrelated panel while keeping the same count.
+  await expect(page.locator('#app .panel')).toHaveCount(7);
   expect(await page.locator('#app .panel').evaluateAll(nodes => nodes.map(node => node.id))).toEqual([
-    'fo', 'callers', 'buffer', 'oracle', 'provenance', 'security-properties',
+    'fo', 'callers', 'buffer', 'oracle', 'provenance', 'malformed', 'security-properties',
   ]);
   await expect(page.locator('.cl-hero-title')).toHaveText('KEM Trap');
 
