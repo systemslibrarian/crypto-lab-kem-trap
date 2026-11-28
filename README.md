@@ -1,8 +1,10 @@
 # crypto-lab-kem-trap
 
-**KEM Trap** — a browser demo of ML-KEM-768 decapsulation failure semantics: how a correctly-implemented, ACVP-validated KEM still gets destroyed by the code that calls it.
+**KEM Trap** — a browser demo of ML-KEM-768 decapsulation failure semantics: how caller behavior affects a KEM even when its output matches a published test vector.
 
 **Live demo:** https://systemslibrarian.github.io/crypto-lab-kem-trap/
+
+The official NIST ACVP example used here is ML-KEM-768 encapsulation test case 26. The project also checks three deterministic examples against its library reference. Matching these bytes establishes the recorded test outcomes. Product validation requires a separate validation record.
 
 ## Security-property matrix
 
@@ -97,7 +99,7 @@ npm run preview    # serve the production build
 ## Build & Verify
 
 - **60 unit tests** (Vitest) across seven files, run in CI before deploy:
-  - `src/__tests__/mlkem.test.ts` — round-trips, FIPS 203 lengths, implicit-rejection (never throws on a wrong-but-well-formed ciphertext), and **3 deterministic known-answer vectors** pinned to the ACVP-validated reference (`src/kem/vectors.ts`).
+  - `src/__tests__/mlkem.test.ts` — round-trips, FIPS 203 lengths, implicit-rejection (never throws on a wrong-but-well-formed ciphertext), and **3 deterministic known-answer vectors** pinned to the library reference (`src/kem/vectors.ts`).
   - `src/__tests__/malformed.test.ts` — the MAL-BIND exhibit (act 6): the two collisions on real ML-KEM-768, the §7.3 hash check, the public-key-binding fix, and an **official NIST ACVP ML-KEM-768 known-answer vector** (`src/kem/acvp-vectors.ts`) reproduced by both the reference and this lab's own FO reconstruction.
   - `src/__tests__/fo-transform.test.ts` — the transparent FO reconstruction checked **byte-for-byte against the reference `decapsulate`** across valid and tampered ciphertexts, plus `m'` recovery and `J(z‖c)` = SHAKE256(z‖c) verification.
   - `src/__tests__/callers.test.ts` — SAFE uniform rejection + confirmation, BROKEN fail-open on stale buffers, the oracle distinguisher, provenance, and the confirmation-MAC fix (verifies for the intended party, fails for the wrong one).
